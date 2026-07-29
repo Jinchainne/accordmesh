@@ -22,8 +22,7 @@ import {
   analyzeCase,
   assignRole,
   createDispute,
-  getPlatformConfig,
-  listDisputes,
+  loadWorkspaceSnapshot,
   publishFinalTerms,
   recordMediation,
   reviewAppeal,
@@ -77,17 +76,18 @@ export function Workspace() {
   ).length;
 
   async function loadData() {
-    const [loadedDisputes, loadedPlatformConfig] = await Promise.all([
-      listDisputes(),
-      getPlatformConfig(),
-    ]);
-    setDisputes(loadedDisputes);
-    setPlatformConfig(loadedPlatformConfig);
+    const snapshot = await loadWorkspaceSnapshot();
+    setDisputes(snapshot.disputes);
+    setPlatformConfig(snapshot.platformConfig);
     setSelectedCaseId((current) =>
-      current && loadedDisputes.some((item) => item.id === current)
+      current && snapshot.disputes.some((item) => item.id === current)
         ? current
-        : (loadedDisputes[0]?.id ?? ""),
+        : (snapshot.disputes[0]?.id ?? ""),
     );
+
+    if (snapshot.warnings.length) {
+      setErrorMessage(snapshot.warnings.join(" "));
+    }
   }
 
   const refreshData = useEffectEvent(async () => {
@@ -133,7 +133,11 @@ export function Workspace() {
       tone?: "default" | "ok" | "warn" | "danger";
     }> = [
       { label: "Provider", value: "Injected", tone: "ok" },
-      { label: "MetaMask", value: provider.isMetaMask ? "Yes" : "No", tone: provider.isMetaMask ? "ok" : "warn" },
+      {
+        label: "MetaMask",
+        value: provider.isMetaMask ? (provider.isRabby ? "Spoofed by Rabby" : "Yes") : "No",
+        tone: provider.isMetaMask ? (provider.isRabby ? "warn" : "ok") : "warn",
+      },
       { label: "Snaps API", value: "Checking..." },
       { label: "GenLayer Snap", value: "Checking..." },
     ];
@@ -145,6 +149,14 @@ export function Workspace() {
         value: clientVersion || "Unknown",
         tone: "default",
       });
+
+      if (clientVersion?.toLowerCase().includes("rabby") || provider.isRabby) {
+        nextDiagnostics.push({
+          label: "Compatibility",
+          value: "Rabby does not support GenLayer Snap. Use desktop MetaMask.",
+          tone: "danger",
+        });
+      }
     } catch {
       nextDiagnostics.push({
         label: "Client",
@@ -309,6 +321,25 @@ export function Workspace() {
   }, [connectedAddress, isConnected, lastPreparedAddress, prepareConnectedWallet]);
 
   async function connectWallet() {
+    const provider = getBrowserProvider();
+    if (provider?.isRabby) {
+      setWalletMessage("Rabby is detected, but GenLayer Studionet setup requires desktop MetaMask with Snaps.");
+      setWalletDiagnostics((current) => [
+        ...current.filter((item) => item.label !== "Compatibility" && item.label !== "Connect step"),
+        {
+          label: "Compatibility",
+          value: "Rabby does not support GenLayer Snap. Switch to MetaMask.",
+          tone: "danger",
+        },
+        {
+          label: "Connect step",
+          value: "Blocked because the active injected wallet is Rabby.",
+          tone: "danger",
+        },
+      ]);
+      return;
+    }
+
     if (!isConnected) {
       if (openConnectModal) {
         setWalletMessage("Choose a wallet in the connect modal.");

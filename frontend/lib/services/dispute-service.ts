@@ -93,6 +93,68 @@ export async function getPlatformConfig(): Promise<PlatformConfig> {
   );
 }
 
+export async function loadWorkspaceSnapshot(): Promise<{
+  disputes: DisputeRecord[];
+  platformConfig: PlatformConfig;
+  warnings: string[];
+}> {
+  if (isMockMode) {
+    loadMockDisputesFromStorage();
+    return {
+      disputes: mockDisputes,
+      platformConfig: mockPlatformConfig,
+      warnings: [],
+    };
+  }
+
+  const [disputesResult, platformConfigResult] = await Promise.allSettled([
+    listDisputes(),
+    getPlatformConfig(),
+  ]);
+
+  const warnings: string[] = [];
+
+  const disputes =
+    disputesResult.status === "fulfilled"
+      ? disputesResult.value
+      : [];
+
+  if (disputesResult.status === "rejected") {
+    warnings.push(
+      disputesResult.reason instanceof Error
+        ? `Case board sync failed: ${disputesResult.reason.message}`
+        : "Case board sync failed.",
+    );
+  }
+
+  const platformConfig =
+    platformConfigResult.status === "fulfilled"
+      ? platformConfigResult.value
+      : {
+          platformName: "AccordMesh",
+          rulesUri: "",
+          operator: "",
+        };
+
+  if (platformConfigResult.status === "rejected") {
+    warnings.push(
+      platformConfigResult.reason instanceof Error
+        ? `Platform config sync failed: ${platformConfigResult.reason.message}`
+        : "Platform config sync failed.",
+    );
+  }
+
+  if (!warnings.length) {
+    return { disputes, platformConfig, warnings };
+  }
+
+  if (disputesResult.status === "rejected" && platformConfigResult.status === "rejected") {
+    throw new Error(warnings.join(" "));
+  }
+
+  return { disputes, platformConfig, warnings };
+}
+
 export async function createDispute(input: NewDisputeInput, actor?: string): Promise<string> {
   if (isMockMode) {
     const claimant = actor ?? "0xClaimant";

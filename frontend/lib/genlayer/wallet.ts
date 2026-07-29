@@ -1,5 +1,6 @@
 export type EthereumProvider = {
   isMetaMask?: boolean;
+  isRabby?: boolean;
   providers?: EthereumProvider[];
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
   on?(event: string, listener: (...args: unknown[]) => void): void;
@@ -23,7 +24,12 @@ export function getBrowserProvider() {
   }
 
   if (Array.isArray(injected.providers) && injected.providers.length) {
-    return injected.providers.find((provider) => provider.isMetaMask) ?? injected.providers[0] ?? injected;
+    return (
+      injected.providers.find((provider) => provider.isMetaMask && !provider.isRabby) ??
+      injected.providers.find((provider) => provider.isMetaMask) ??
+      injected.providers[0] ??
+      injected
+    );
   }
 
   return injected;
