@@ -8,7 +8,7 @@ type EvidenceUploaderProps = {
 };
 
 export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps) {
-  const [provider, setProvider] = useState<"ipfs" | "drive">("ipfs");
+  const [provider, setProvider] = useState<"browser" | "ipfs" | "drive">("browser");
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState("");
   const [providerStatus, setProviderStatus] = useState<{
@@ -67,12 +67,31 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
     if (provider === "drive" && !providerStatus.drive && providerStatus.ipfs) {
       setProvider("ipfs");
     }
+
+    if (provider === "browser") {
+      return;
+    }
+
+    if (!providerStatus.ipfs && !providerStatus.drive) {
+      setProvider("browser");
+    }
   }, [provider, providerStatus.drive, providerStatus.ipfs]);
 
   function upload() {
     startTransition(async () => {
       try {
         setMessage("");
+
+        if (provider === "browser") {
+          const urls = files.map((file) => URL.createObjectURL(file));
+          onUploaded(urls);
+          setFiles([]);
+          setMessage(
+            `${urls.length} file(s) attached in browser draft mode. These links are temporary for this browser session.`,
+          );
+          return;
+        }
+
         const formData = new FormData();
         formData.append("provider", provider);
         files.forEach((file) => formData.append("files", file));
@@ -110,9 +129,10 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
       <div className="uploader-controls">
         <select
           value={provider}
-          onChange={(event) => setProvider(event.target.value as "ipfs" | "drive")}
+          onChange={(event) => setProvider(event.target.value as "browser" | "ipfs" | "drive")}
           disabled={disabled || isPending}
         >
+          <option value="browser">Browser draft upload</option>
           <option value="ipfs" disabled={!providerStatus.ipfs}>
             IPFS via Pinata{providerStatus.ipfs ? "" : " (not configured)"}
           </option>
@@ -134,7 +154,11 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
             disabled ||
             isPending ||
             files.length === 0 ||
-            (provider === "ipfs" ? !providerStatus.ipfs : !providerStatus.drive)
+            (provider === "ipfs"
+              ? !providerStatus.ipfs
+              : provider === "drive"
+                ? !providerStatus.drive
+                : false)
           }
         >
           {isPending ? "Uploading..." : "Upload evidence"}
@@ -147,7 +171,12 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
           ))}
         </div>
       ) : null}
-      <p className="tiny-note">{message || providerStatus.note}</p>
+      <p className="tiny-note">
+        {message ||
+          (provider === "browser"
+            ? "Browser draft upload keeps files available only in this browser session."
+            : providerStatus.note)}
+      </p>
     </div>
   );
 }

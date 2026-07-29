@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { appConfig } from "../lib/genlayer/config";
+import { createWriteClient } from "../lib/genlayer/client";
 import { getBrowserProvider } from "../lib/genlayer/wallet";
 import type {
   AppealReviewInput,
@@ -147,9 +148,36 @@ export function Workspace() {
       setWalletMessage("Waiting for wallet approval...");
       const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
       const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
-      setWalletAddress(accounts[0] ?? "");
+      const nextAddress = accounts[0] ?? "";
+      setWalletAddress(nextAddress);
       setChainId(nextChainId ?? "");
-      setWalletMessage(accounts[0] ? `Connected as ${accounts[0]}.` : "Wallet request completed.");
+
+      if (!nextAddress) {
+        setWalletMessage("Wallet approved but no account was returned.");
+        return;
+      }
+
+      setWalletMessage("Wallet connected. Preparing GenLayer Studionet access...");
+
+      try {
+        const writeClient = createWriteClient(nextAddress as `0x${string}`, provider);
+        await writeClient.connect(appConfig.networkName as never);
+        const updatedChainId = (await provider.request({ method: "eth_chainId" })) as string;
+        setChainId(updatedChainId ?? nextChainId ?? "");
+        setWalletMessage(
+          `Connected as ${nextAddress}. Studionet access is ready${
+            updatedChainId ? ` on chain ${updatedChainId}` : ""
+          }.`,
+        );
+      } catch (networkError) {
+        const message =
+          networkError instanceof Error
+            ? networkError.message
+            : "Wallet connected, but GenLayer network setup failed.";
+        setWalletMessage(
+          `${message} Use desktop MetaMask with Snaps enabled to complete Studionet setup.`,
+        );
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet connection failed.";
       setErrorMessage(message);
