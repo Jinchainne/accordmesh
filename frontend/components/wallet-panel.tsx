@@ -9,6 +9,7 @@ type WalletPanelProps = {
   mode: string;
   networkName: string;
   rpcUrl: string;
+  message?: string;
   onConnect(): void;
   onRefresh(): void;
 };
@@ -22,6 +23,7 @@ export function WalletPanel({
   mode,
   networkName,
   rpcUrl,
+  message,
   onConnect,
   onRefresh,
 }: WalletPanelProps) {
@@ -65,6 +67,7 @@ export function WalletPanel({
           Refresh cases
         </button>
       </div>
+      {message ? <p className="tiny-note">{message}</p> : null}
     </section>
   );
 }

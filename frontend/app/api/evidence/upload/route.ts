@@ -112,6 +112,31 @@ async function uploadToDrive(file: File) {
     url: targetUrl,
   };
 }
+
+export async function GET() {
+  const ipfsEnabled = Boolean(process.env.PINATA_JWT);
+  const driveEnabled = Boolean(
+    process.env.GOOGLE_DRIVE_CLIENT_EMAIL &&
+      process.env.GOOGLE_DRIVE_PRIVATE_KEY &&
+      process.env.GOOGLE_DRIVE_FOLDER_ID,
+  );
+
+  let note = "No upload provider is configured on the server yet.";
+  if (ipfsEnabled && driveEnabled) {
+    note = "IPFS and Google Drive uploads are available.";
+  } else if (ipfsEnabled) {
+    note = "IPFS upload is available. Google Drive is not configured yet.";
+  } else if (driveEnabled) {
+    note = "Google Drive upload is available. IPFS is not configured yet.";
+  }
+
+  return NextResponse.json({
+    ipfsEnabled,
+    driveEnabled,
+    note,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();

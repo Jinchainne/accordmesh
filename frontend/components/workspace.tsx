@@ -48,6 +48,7 @@ export function Workspace() {
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [chainId, setChainId] = useState("");
+  const [walletMessage, setWalletMessage] = useState("");
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -92,6 +93,7 @@ export function Workspace() {
   const syncWalletState = useEffectEvent(async () => {
     const provider = getBrowserProvider();
     if (!provider) {
+      setWalletMessage("No injected browser wallet was found in this browser.");
       return;
     }
 
@@ -99,6 +101,11 @@ export function Workspace() {
     const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
     setWalletAddress(accounts[0] ?? "");
     setChainId(nextChainId ?? "");
+    setWalletMessage(
+      accounts[0]
+        ? "Wallet connected and ready to sign GenLayer transactions."
+        : "Wallet detected. Connect MetaMask to sign transactions.",
+    );
   });
 
   useEffect(() => {
@@ -131,17 +138,22 @@ export function Workspace() {
     const provider = getBrowserProvider();
     if (!provider) {
       setErrorMessage("No browser wallet detected.");
+      setWalletMessage("No injected browser wallet was found. Open the app in a browser with MetaMask.");
       return;
     }
 
     try {
       setErrorMessage("");
+      setWalletMessage("Waiting for wallet approval...");
       const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
       const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
       setWalletAddress(accounts[0] ?? "");
       setChainId(nextChainId ?? "");
+      setWalletMessage(accounts[0] ? `Connected as ${accounts[0]}.` : "Wallet request completed.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Wallet connection failed.");
+      const message = error instanceof Error ? error.message : "Wallet connection failed.";
+      setErrorMessage(message);
+      setWalletMessage(message);
     }
   }
 
@@ -267,6 +279,7 @@ export function Workspace() {
             mode={appConfig.mode}
             networkName={appConfig.networkName}
             rpcUrl={appConfig.rpcUrl}
+            message={walletMessage}
             onConnect={connectWallet}
             onRefresh={() => {
               startTransition(async () => {

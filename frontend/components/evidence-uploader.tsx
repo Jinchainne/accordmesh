@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 type EvidenceUploaderProps = {
   disabled?: boolean;
@@ -11,7 +11,63 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
   const [provider, setProvider] = useState<"ipfs" | "drive">("ipfs");
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState("");
+  const [providerStatus, setProviderStatus] = useState<{
+    ipfs: boolean;
+    drive: boolean;
+    note: string;
+  }>({
+    ipfs: false,
+    drive: false,
+    note: "Checking upload providers...",
+  });
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProviderStatus() {
+      try {
+        const response = await fetch("/api/evidence/upload", { method: "GET" });
+        const payload = (await response.json()) as {
+          ipfsEnabled?: boolean;
+          driveEnabled?: boolean;
+          note?: string;
+        };
+
+        if (!active) return;
+
+        setProviderStatus({
+          ipfs: Boolean(payload.ipfsEnabled),
+          drive: Boolean(payload.driveEnabled),
+          note: payload.note ?? "Upload provider status loaded.",
+        });
+      } catch {
+        if (!active) return;
+
+        setProviderStatus({
+          ipfs: false,
+          drive: false,
+          note: "Could not verify upload provider status.",
+        });
+      }
+    }
+
+    void loadProviderStatus();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (provider === "ipfs" && !providerStatus.ipfs && providerStatus.drive) {
+      setProvider("drive");
+    }
+
+    if (provider === "drive" && !providerStatus.drive && providerStatus.ipfs) {
+      setProvider("ipfs");
+    }
+  }, [provider, providerStatus.drive, providerStatus.ipfs]);
 
   function upload() {
     startTransition(async () => {
@@ -57,8 +113,12 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
           onChange={(event) => setProvider(event.target.value as "ipfs" | "drive")}
           disabled={disabled || isPending}
         >
-          <option value="ipfs">IPFS via Pinata</option>
-          <option value="drive">Google Drive</option>
+          <option value="ipfs" disabled={!providerStatus.ipfs}>
+            IPFS via Pinata{providerStatus.ipfs ? "" : " (not configured)"}
+          </option>
+          <option value="drive" disabled={!providerStatus.drive}>
+            Google Drive{providerStatus.drive ? "" : " (not configured)"}
+          </option>
         </select>
         <input
           type="file"
@@ -70,7 +130,12 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
           className="button secondary"
           type="button"
           onClick={upload}
-          disabled={disabled || isPending || files.length === 0}
+          disabled={
+            disabled ||
+            isPending ||
+            files.length === 0 ||
+            (provider === "ipfs" ? !providerStatus.ipfs : !providerStatus.drive)
+          }
         >
           {isPending ? "Uploading..." : "Upload evidence"}
         </button>
@@ -82,7 +147,7 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
           ))}
         </div>
       ) : null}
-      {message ? <p className="tiny-note">{message}</p> : null}
+      <p className="tiny-note">{message || providerStatus.note}</p>
     </div>
   );
 }
