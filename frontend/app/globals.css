@@ -704,6 +704,50 @@ p {
   font-size: 13px;
 }
 
+.diagnostic-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.diagnostic-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(20, 41, 58, 0.04);
+  border: 1px solid rgba(20, 41, 58, 0.08);
+}
+
+.diagnostic-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.diagnostic-row strong {
+  max-width: 62%;
+  text-align: right;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.diagnostic-row.ok strong {
+  color: var(--accent);
+}
+
+.diagnostic-row.warn strong {
+  color: var(--accent-2);
+}
+
+.diagnostic-row.danger strong {
+  color: var(--danger);
+}
+
 .error-panel {
   border-color: rgba(182, 68, 68, 0.3);
 }

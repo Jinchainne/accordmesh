@@ -1,6 +1,8 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
+import { useAccount, useDisconnect } from "wagmi";
 import { appConfig } from "../lib/genlayer/config";
 import { createWriteClient } from "../lib/genlayer/client";
 import { getBrowserProvider } from "../lib/genlayer/wallet";
@@ -40,6 +42,9 @@ const idleTransaction: TransactionState = {
 };
 
 export function Workspace() {
+  const { address: connectedAddress, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
     platformName: "AccordMesh",
@@ -50,9 +55,18 @@ export function Workspace() {
   const [walletAddress, setWalletAddress] = useState("");
   const [chainId, setChainId] = useState("");
   const [walletMessage, setWalletMessage] = useState("");
+  const [walletDiagnostics, setWalletDiagnostics] = useState<
+    Array<{ label: string; value: string; tone?: "default" | "ok" | "warn" | "danger" }>
+  >([
+    { label: "Provider", value: "Checking..." },
+    { label: "MetaMask", value: "Checking..." },
+    { label: "Snaps API", value: "Checking..." },
+    { label: "GenLayer Snap", value: "Checking..." },
+  ]);
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [lastPreparedAddress, setLastPreparedAddress] = useState("");
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
@@ -91,10 +105,99 @@ export function Workspace() {
     });
   }, [refreshData]);
 
+  useEffect(() => {
+    if (!connectedAddress) {
+      setWalletAddress("");
+      setLastPreparedAddress("");
+      return;
+    }
+
+    setWalletAddress(connectedAddress);
+  }, [connectedAddress]);
+
+  const inspectWallet = useEffectEvent(async () => {
+    const provider = getBrowserProvider();
+    if (!provider) {
+      setWalletDiagnostics([
+        { label: "Provider", value: "Not found", tone: "danger" },
+        { label: "MetaMask", value: "Unavailable", tone: "danger" },
+        { label: "Snaps API", value: "Unavailable", tone: "danger" },
+        { label: "GenLayer Snap", value: "Unknown", tone: "warn" },
+      ]);
+      return;
+    }
+
+    const nextDiagnostics: Array<{
+      label: string;
+      value: string;
+      tone?: "default" | "ok" | "warn" | "danger";
+    }> = [
+      { label: "Provider", value: "Injected", tone: "ok" },
+      { label: "MetaMask", value: provider.isMetaMask ? "Yes" : "No", tone: provider.isMetaMask ? "ok" : "warn" },
+      { label: "Snaps API", value: "Checking..." },
+      { label: "GenLayer Snap", value: "Checking..." },
+    ];
+
+    try {
+      const clientVersion = (await provider.request({ method: "web3_clientVersion" })) as string;
+      nextDiagnostics.push({
+        label: "Client",
+        value: clientVersion || "Unknown",
+        tone: "default",
+      });
+    } catch {
+      nextDiagnostics.push({
+        label: "Client",
+        value: "Unavailable",
+        tone: "warn",
+      });
+    }
+
+    try {
+      const snaps = (await provider.request({ method: "wallet_getSnaps" })) as Record<
+        string,
+        { id?: string; version?: string }
+      >;
+      const snapEntries = Object.values(snaps ?? {});
+      const genlayerSnap = snapEntries.find((snap) => snap.id?.includes("genlayer"));
+
+      nextDiagnostics[2] = {
+        label: "Snaps API",
+        value: "Available",
+        tone: "ok",
+      };
+      nextDiagnostics[3] = genlayerSnap
+        ? {
+            label: "GenLayer Snap",
+            value: `${genlayerSnap.id}${genlayerSnap.version ? ` @ ${genlayerSnap.version}` : ""}`,
+            tone: "ok",
+          }
+        : {
+            label: "GenLayer Snap",
+            value: "Not installed",
+            tone: "warn",
+          };
+    } catch (error) {
+      nextDiagnostics[2] = {
+        label: "Snaps API",
+        value: "Not available",
+        tone: "danger",
+      };
+      nextDiagnostics[3] = {
+        label: "GenLayer Snap",
+        value: error instanceof Error ? error.message : "Could not inspect snaps",
+        tone: "warn",
+      };
+    }
+
+    setWalletDiagnostics(nextDiagnostics);
+  });
+
   const syncWalletState = useEffectEvent(async () => {
     const provider = getBrowserProvider();
     if (!provider) {
       setWalletMessage("No injected browser wallet was found in this browser.");
+      await inspectWallet();
       return;
     }
 
@@ -107,6 +210,7 @@ export function Workspace() {
         ? "Wallet connected and ready to sign GenLayer transactions."
         : "Wallet detected. Connect MetaMask to sign transactions.",
     );
+    await inspectWallet();
   });
 
   useEffect(() => {
@@ -129,13 +233,13 @@ export function Workspace() {
     provider.on?.("accountsChanged", handleAccountsChanged);
     provider.on?.("chainChanged", handleChainChanged);
 
-    return () => {
-      provider.removeListener?.("accountsChanged", handleAccountsChanged);
-      provider.removeListener?.("chainChanged", handleChainChanged);
-    };
+      return () => {
+        provider.removeListener?.("accountsChanged", handleAccountsChanged);
+        provider.removeListener?.("chainChanged", handleChainChanged);
+      };
   }, [syncWalletState]);
 
-  async function connectWallet() {
+  const prepareConnectedWallet = useEffectEvent(async (address: string) => {
     const provider = getBrowserProvider();
     if (!provider) {
       setErrorMessage("No browser wallet detected.");
@@ -145,30 +249,23 @@ export function Workspace() {
 
     try {
       setErrorMessage("");
-      setWalletMessage("Waiting for wallet approval...");
-      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      await inspectWallet();
       const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
-      const nextAddress = accounts[0] ?? "";
-      setWalletAddress(nextAddress);
       setChainId(nextChainId ?? "");
-
-      if (!nextAddress) {
-        setWalletMessage("Wallet approved but no account was returned.");
-        return;
-      }
-
       setWalletMessage("Wallet connected. Preparing GenLayer Studionet access...");
 
       try {
-        const writeClient = createWriteClient(nextAddress as `0x${string}`, provider);
+        const writeClient = createWriteClient(address as `0x${string}`, provider);
         await writeClient.connect(appConfig.networkName as never);
         const updatedChainId = (await provider.request({ method: "eth_chainId" })) as string;
         setChainId(updatedChainId ?? nextChainId ?? "");
         setWalletMessage(
-          `Connected as ${nextAddress}. Studionet access is ready${
+          `Connected as ${address}. Studionet access is ready${
             updatedChainId ? ` on chain ${updatedChainId}` : ""
           }.`,
         );
+        await inspectWallet();
+        setLastPreparedAddress(address);
       } catch (networkError) {
         const message =
           networkError instanceof Error
@@ -177,12 +274,58 @@ export function Workspace() {
         setWalletMessage(
           `${message} Use desktop MetaMask with Snaps enabled to complete Studionet setup.`,
         );
+        setWalletDiagnostics((current) => [
+          ...current.filter((item) => item.label !== "Connect step"),
+          {
+            label: "Connect step",
+            value: message,
+            tone: "danger",
+          },
+        ]);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet connection failed.";
       setErrorMessage(message);
       setWalletMessage(message);
+      setWalletDiagnostics((current) => [
+        ...current.filter((item) => item.label !== "Connect step"),
+        {
+          label: "Connect step",
+          value: message,
+          tone: "danger",
+        },
+      ]);
     }
+  });
+
+  useEffect(() => {
+    if (!isConnected || !connectedAddress || lastPreparedAddress === connectedAddress) {
+      return;
+    }
+
+    startTransition(async () => {
+      await prepareConnectedWallet(connectedAddress);
+    });
+  }, [connectedAddress, isConnected, lastPreparedAddress, prepareConnectedWallet]);
+
+  async function connectWallet() {
+    if (!isConnected) {
+      if (openConnectModal) {
+        setWalletMessage("Choose a wallet in the connect modal.");
+        openConnectModal();
+        return;
+      }
+
+      setWalletMessage("Connect modal is unavailable. Reload and try again.");
+      return;
+    }
+
+    if (connectedAddress) {
+      await prepareConnectedWallet(connectedAddress);
+      return;
+    }
+
+    disconnect();
   }
 
   async function runMutation(label: string, task: () => Promise<string>) {
@@ -302,12 +445,15 @@ export function Workspace() {
             address={walletAddress}
             chainId={chainId}
             hasWallet={Boolean(getBrowserProvider())}
-            isConnected={walletAddress !== ""}
+            isConnected={isConnected && walletAddress !== ""}
             isBusy={isPending}
             mode={appConfig.mode}
             networkName={appConfig.networkName}
             rpcUrl={appConfig.rpcUrl}
             message={walletMessage}
+            canConnect={Boolean(openConnectModal) || Boolean(getBrowserProvider())}
+            connectLabel={isConnected ? "Prepare Studionet" : "Connect wallet"}
+            diagnostics={walletDiagnostics}
             onConnect={connectWallet}
             onRefresh={() => {
               startTransition(async () => {

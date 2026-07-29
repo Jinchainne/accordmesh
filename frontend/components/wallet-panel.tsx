@@ -10,6 +10,9 @@ type WalletPanelProps = {
   networkName: string;
   rpcUrl: string;
   message?: string;
+  canConnect: boolean;
+  connectLabel: string;
+  diagnostics: Array<{ label: string; value: string; tone?: "default" | "ok" | "warn" | "danger" }>;
   onConnect(): void;
   onRefresh(): void;
 };
@@ -24,6 +27,9 @@ export function WalletPanel({
   networkName,
   rpcUrl,
   message,
+  canConnect,
+  connectLabel,
+  diagnostics,
   onConnect,
   onRefresh,
 }: WalletPanelProps) {
@@ -60,14 +66,22 @@ export function WalletPanel({
         </div>
       </div>
       <div className="actions-row tight-actions">
-        <button className="button" type="button" onClick={onConnect} disabled={isBusy || !hasWallet}>
-          {isConnected ? "Reconnect wallet" : "Connect wallet"}
+        <button className="button" type="button" onClick={onConnect} disabled={isBusy || !canConnect}>
+          {connectLabel}
         </button>
         <button className="button secondary" type="button" onClick={onRefresh} disabled={isBusy}>
           Refresh cases
         </button>
       </div>
       {message ? <p className="tiny-note">{message}</p> : null}
+      <div className="diagnostic-list">
+        {diagnostics.map((item) => (
+          <div className={`diagnostic-row ${item.tone ?? "default"}`} key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

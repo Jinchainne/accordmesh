@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { AppProviders } from "./providers";
 import "./globals.css";
 
 const serif = Cormorant_Garamond({
@@ -26,7 +27,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${serif.variable} ${sans.variable}`}>{children}</body>
+      <body className={`${serif.variable} ${sans.variable}`}>
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }
