@@ -25,6 +25,8 @@ type Eip6963ProviderDetail = {
   provider: EthereumProvider;
 };
 
+export const ACCORDMESH_PROVIDER_EVENT = "accordmesh:providersChanged";
+
 const discoveredProviders = new Map<string, Eip6963ProviderDetail>();
 let discoveryInitialized = false;
 
@@ -40,6 +42,9 @@ function isMetaMaskDetail(detail: Eip6963ProviderDetail) {
 
 function registerDiscoveredProvider(detail: Eip6963ProviderDetail) {
   discoveredProviders.set(getProviderKey(detail), detail);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ACCORDMESH_PROVIDER_EVENT));
+  }
 }
 
 export function primeBrowserProviders() {
@@ -61,13 +66,12 @@ export function primeBrowserProviders() {
 
 function getAllProviders() {
   const injected = window.ethereum ?? null;
-  if (!injected) {
-    return [];
-  }
-
-  const directProviders = Array.isArray(injected.providers) && injected.providers.length
-    ? injected.providers
-    : [injected];
+  const directProviders =
+    injected && Array.isArray(injected.providers) && injected.providers.length
+      ? injected.providers
+      : injected
+        ? [injected]
+        : [];
 
   const announcedProviders = Array.from(discoveredProviders.values()).map((detail) => detail.provider);
   const uniqueProviders = new Set<EthereumProvider>();
@@ -81,6 +85,18 @@ function getAllProviders() {
   }
 
   return Array.from(uniqueProviders);
+}
+
+function getProviderLabel(provider: EthereumProvider) {
+  if (provider.isRabby) {
+    return "Rabby";
+  }
+
+  if (provider.isMetaMask) {
+    return "MetaMask";
+  }
+
+  return "Injected";
 }
 
 export function getBrowserProvider() {
@@ -108,5 +124,51 @@ export function getBrowserProvider() {
     providers.find((provider) => provider.isMetaMask) ??
     providers[0] ??
     null
+  );
+}
+
+export function getDetectedWalletLabels() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  primeBrowserProviders();
+
+  const labels = new Set<string>();
+  for (const provider of getAllProviders()) {
+    labels.add(getProviderLabel(provider));
+  }
+
+  for (const detail of discoveredProviders.values()) {
+    const name = detail.info.name?.trim();
+    const rdns = detail.info.rdns?.toLowerCase() ?? "";
+    if (name) {
+      labels.add(name);
+      continue;
+    }
+
+    if (rdns.includes("metamask")) {
+      labels.add("MetaMask");
+      continue;
+    }
+
+    if (rdns.includes("rabby")) {
+      labels.add("Rabby");
+    }
+  }
+
+  return Array.from(labels);
+}
+
+export function hasDedicatedMetaMaskProvider() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  primeBrowserProviders();
+
+  return Boolean(
+    Array.from(discoveredProviders.values()).find((detail) => isMetaMaskDetail(detail) && !detail.provider.isRabby) ||
+      getAllProviders().find((provider) => provider.isMetaMask && !provider.isRabby),
   );
 }

@@ -1,9 +1,13 @@
 "use client";
 
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { appConfig } from "../lib/genlayer/config";
-import { getBrowserProvider } from "../lib/genlayer/wallet";
+import {
+  ACCORDMESH_PROVIDER_EVENT,
+  getBrowserProvider,
+  getDetectedWalletLabels,
+  hasDedicatedMetaMaskProvider,
+} from "../lib/genlayer/wallet";
 import { studionetChain } from "../lib/wallet/studionet-chain";
 import type {
   AppealReviewInput,
@@ -40,7 +44,6 @@ const idleTransaction: TransactionState = {
 };
 
 export function Workspace() {
-  const { openConnectModal } = useConnectModal();
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
     platformName: "AccordMesh",
@@ -152,6 +155,23 @@ export function Workspace() {
       });
     }
 
+    const detectedWallets = getDetectedWalletLabels();
+    if (detectedWallets.length) {
+      nextDiagnostics.push({
+        label: "Detected wallets",
+        value: detectedWallets.join(", "),
+        tone: detectedWallets.some((item) => item.toLowerCase().includes("metamask")) ? "ok" : "warn",
+      });
+    }
+
+    if (provider.isRabby && !hasDedicatedMetaMaskProvider()) {
+      nextDiagnostics.push({
+        label: "Recommendation",
+        value: "Only Rabby is active for this site. Disable Rabby here or open a MetaMask-only browser profile.",
+        tone: "warn",
+      });
+    }
+
     try {
       const currentChainId = (await provider.request({ method: "eth_chainId" })) as string;
       nextDiagnostics[2] = {
@@ -202,11 +222,19 @@ export function Workspace() {
 
   useEffect(() => {
     const provider = getBrowserProvider();
-    if (!provider) {
-      return;
-    }
-
     void syncWalletState();
+
+    const handleProviderInventoryChanged = () => {
+      void syncWalletState();
+    };
+
+    window.addEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
+
+    if (!provider) {
+      return () => {
+        window.removeEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
+      };
+    }
 
     const handleAccountsChanged = (accounts: unknown) => {
       const nextAccounts = Array.isArray(accounts) ? accounts.map(String) : [];
@@ -221,6 +249,7 @@ export function Workspace() {
     provider.on?.("chainChanged", handleChainChanged);
 
     return () => {
+      window.removeEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
       provider.removeListener?.("accountsChanged", handleAccountsChanged);
       provider.removeListener?.("chainChanged", handleChainChanged);
     };
@@ -300,43 +329,36 @@ export function Workspace() {
 
   async function connectWallet() {
     const provider = getBrowserProvider();
-    if (provider) {
-      try {
-        setWalletMessage("Requesting wallet access...");
-        const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-        const nextAddress = accounts[0] ?? "";
-
-        if (nextAddress) {
-          await prepareConnectedWallet(nextAddress);
-          return;
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Wallet access request failed.";
-        setWalletMessage(message);
-        setWalletDiagnostics((current) => [
-          ...current.filter((item) => item.label !== "Connect step"),
-          {
-            label: "Connect step",
-            value: message,
-            tone: "danger",
-          },
-        ]);
-
-        if (openConnectModal) {
-          setWalletMessage("Injected wallet request failed. Try choosing a wallet in the modal.");
-          openConnectModal();
-        }
-        return;
-      }
-    }
-
-    if (openConnectModal) {
-      setWalletMessage("Choose a wallet in the connect modal.");
-      openConnectModal();
+    if (!provider) {
+      setWalletMessage("No injected browser wallet was found. Install MetaMask or reopen this page in your wallet browser.");
+      await inspectWallet();
       return;
     }
 
-    setWalletMessage("No compatible wallet connector is available in this browser.");
+    try {
+      setWalletMessage("Requesting wallet access...");
+      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const nextAddress = accounts[0] ?? "";
+
+      if (nextAddress) {
+        await prepareConnectedWallet(nextAddress);
+        return;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Wallet access request failed.";
+      setWalletMessage(message);
+      setWalletDiagnostics((current) => [
+        ...current.filter((item) => item.label !== "Connect step"),
+        {
+          label: "Connect step",
+          value: message,
+          tone: "danger",
+        },
+      ]);
+      return;
+    }
+
+    setWalletMessage("Wallet detected, but no account was returned.");
   }
 
   async function runMutation(label: string, task: () => Promise<string>) {
@@ -462,7 +484,7 @@ export function Workspace() {
             networkName={appConfig.networkName}
             rpcUrl={appConfig.rpcUrl}
             message={walletMessage}
-            canConnect={Boolean(openConnectModal) || Boolean(getBrowserProvider())}
+            canConnect={Boolean(getBrowserProvider())}
             connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
             diagnostics={walletDiagnostics}
             onConnect={connectWallet}
