@@ -2,7 +2,6 @@
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
-import { useAccount, useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { appConfig } from "../lib/genlayer/config";
 import { getBrowserProvider } from "../lib/genlayer/wallet";
 import { studionetChain } from "../lib/wallet/studionet-chain";
@@ -41,10 +40,6 @@ const idleTransaction: TransactionState = {
 };
 
 export function Workspace() {
-  const { address: connectedAddress, isConnected } = useAccount();
-  const connectedChainId = useChainId();
-  const { disconnect } = useDisconnect();
-  const { switchChainAsync } = useSwitchChain();
   const { openConnectModal } = useConnectModal();
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
@@ -67,7 +62,6 @@ export function Workspace() {
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
-  const [lastPreparedAddress, setLastPreparedAddress] = useState("");
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
   const hasConnectedWallet = walletAddress !== "";
@@ -107,22 +101,6 @@ export function Workspace() {
       await refreshData();
     });
   }, [refreshData]);
-
-  useEffect(() => {
-    if (!connectedAddress) {
-      setWalletAddress("");
-      setLastPreparedAddress("");
-      return;
-    }
-
-    setWalletAddress(connectedAddress);
-  }, [connectedAddress]);
-
-  useEffect(() => {
-    if (connectedChainId) {
-      setChainId(`0x${connectedChainId.toString(16)}`);
-    }
-  }, [connectedChainId]);
 
   const inspectWallet = useEffectEvent(async () => {
     const provider = getBrowserProvider();
@@ -212,10 +190,10 @@ export function Workspace() {
 
     const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
     const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
-    setWalletAddress(accounts[0] ?? connectedAddress ?? "");
-    setChainId((current) => current || nextChainId || "");
+    setWalletAddress(accounts[0] ?? "");
+    setChainId(nextChainId ?? "");
     setWalletMessage(
-      (accounts[0] ?? connectedAddress)
+      accounts[0]
         ? "Wallet connected and ready to sign GenLayer transactions."
         : "Wallet detected. Connect MetaMask to sign transactions.",
     );
@@ -242,11 +220,44 @@ export function Workspace() {
     provider.on?.("accountsChanged", handleAccountsChanged);
     provider.on?.("chainChanged", handleChainChanged);
 
-      return () => {
-        provider.removeListener?.("accountsChanged", handleAccountsChanged);
-        provider.removeListener?.("chainChanged", handleChainChanged);
-      };
+    return () => {
+      provider.removeListener?.("accountsChanged", handleAccountsChanged);
+      provider.removeListener?.("chainChanged", handleChainChanged);
+    };
   }, [syncWalletState]);
+
+  const ensureStudionet = useEffectEvent(async () => {
+    const provider = getBrowserProvider();
+    if (!provider) {
+      throw new Error("No browser wallet detected.");
+    }
+
+    try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0xf22f" }],
+      });
+    } catch (error) {
+      const switchError = error as { code?: number; message?: string };
+
+      if (switchError?.code !== 4902) {
+        throw error;
+      }
+
+      await provider.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: "0xf22f",
+            chainName: studionetChain.name,
+            nativeCurrency: studionetChain.nativeCurrency,
+            rpcUrls: studionetChain.rpcUrls.default.http,
+            blockExplorerUrls: [studionetChain.blockExplorers.default.url],
+          },
+        ],
+      });
+    }
+  });
 
   const prepareConnectedWallet = useEffectEvent(async (address: string) => {
     const provider = getBrowserProvider();
@@ -261,21 +272,17 @@ export function Workspace() {
       await inspectWallet();
       setWalletMessage("Wallet connected. Preparing Studionet network...");
 
-      if (connectedChainId !== studionetChain.id) {
-        await switchChainAsync({
-          chainId: studionetChain.id,
-        });
-      }
+      await ensureStudionet();
 
       const updatedChainId = (await provider.request({ method: "eth_chainId" })) as string;
       setChainId(updatedChainId ?? "");
+      setWalletAddress(address);
       setWalletMessage(
         `Connected as ${address}. Studionet access is ready${
           updatedChainId ? ` on chain ${updatedChainId}` : ""
         }.`,
       );
       await inspectWallet();
-      setLastPreparedAddress(address);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet connection failed.";
       setErrorMessage(message);
@@ -291,56 +298,45 @@ export function Workspace() {
     }
   });
 
-  useEffect(() => {
-    if (!isConnected || !connectedAddress || lastPreparedAddress === connectedAddress) {
-      return;
-    }
-
-    startTransition(async () => {
-      await prepareConnectedWallet(connectedAddress);
-    });
-  }, [connectedAddress, isConnected, lastPreparedAddress, prepareConnectedWallet]);
-
   async function connectWallet() {
-    if (!connectedAddress) {
-      if (openConnectModal) {
-        setWalletMessage("Choose a wallet in the connect modal.");
-        openConnectModal();
-        return;
-      }
+    const provider = getBrowserProvider();
+    if (provider) {
+      try {
+        setWalletMessage("Requesting wallet access...");
+        const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+        const nextAddress = accounts[0] ?? "";
 
-      const provider = getBrowserProvider();
-      if (provider) {
-        try {
-          setWalletMessage("Requesting wallet access...");
-          const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-          const nextAddress = accounts[0] ?? "";
-
-          if (nextAddress) {
-            setWalletAddress(nextAddress);
-            await prepareConnectedWallet(nextAddress);
-            return;
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Wallet access request failed.";
-          setWalletMessage(message);
-          setWalletDiagnostics((current) => [
-            ...current.filter((item) => item.label !== "Connect step"),
-            {
-              label: "Connect step",
-              value: message,
-              tone: "danger",
-            },
-          ]);
+        if (nextAddress) {
+          await prepareConnectedWallet(nextAddress);
           return;
         }
-      }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Wallet access request failed.";
+        setWalletMessage(message);
+        setWalletDiagnostics((current) => [
+          ...current.filter((item) => item.label !== "Connect step"),
+          {
+            label: "Connect step",
+            value: message,
+            tone: "danger",
+          },
+        ]);
 
-      setWalletMessage("Connect modal is unavailable. Reload and try again.");
+        if (openConnectModal) {
+          setWalletMessage("Injected wallet request failed. Try choosing a wallet in the modal.");
+          openConnectModal();
+        }
+        return;
+      }
+    }
+
+    if (openConnectModal) {
+      setWalletMessage("Choose a wallet in the connect modal.");
+      openConnectModal();
       return;
     }
 
-    await prepareConnectedWallet(connectedAddress);
+    setWalletMessage("No compatible wallet connector is available in this browser.");
   }
 
   async function runMutation(label: string, task: () => Promise<string>) {

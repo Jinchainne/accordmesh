@@ -12,11 +12,8 @@ type WalletPanelProps = {
   message?: string;
   canConnect: boolean;
   connectLabel: string;
-  showSnapAction?: boolean;
-  snapActionLabel?: string;
   diagnostics: Array<{ label: string; value: string; tone?: "default" | "ok" | "warn" | "danger" }>;
   onConnect(): void;
-  onInstallSnap?(): void;
   onRefresh(): void;
 };
 
@@ -32,11 +29,8 @@ export function WalletPanel({
   message,
   canConnect,
   connectLabel,
-  showSnapAction,
-  snapActionLabel,
   diagnostics,
   onConnect,
-  onInstallSnap,
   onRefresh,
 }: WalletPanelProps) {
   return (
@@ -75,11 +69,6 @@ export function WalletPanel({
         <button className="button" type="button" onClick={onConnect} disabled={isBusy || !canConnect}>
           {connectLabel}
         </button>
-        {showSnapAction && onInstallSnap ? (
-          <button className="button secondary" type="button" onClick={onInstallSnap} disabled={isBusy}>
-            {snapActionLabel || "Install GenLayer Snap"}
-          </button>
-        ) : null}
         <button className="button secondary" type="button" onClick={onRefresh} disabled={isBusy}>
           Refresh cases
         </button>
