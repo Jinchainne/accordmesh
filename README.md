@@ -2,6 +2,11 @@
 
 AccordMesh is a GenLayer-native dispute casework platform focused on intake, evidence organization, mediation, and resolution drafting.
 
+Live deployment:
+
+- Frontend: https://accordmesh.vercel.app
+- Studionet contract: `0xe21441B7F4e9Caeb1959313551f30FB0a528E1Ba`
+
 This repo is intentionally designed to be structurally and conceptually different from verdict-and-betting dispute apps. The MVP centers on phased casework:
 
 1. Intake and structured dispute filing
@@ -71,6 +76,7 @@ This repo now includes:
 - read + write integration through the official `genlayer-js` SDK
 - mock mode for UI iteration before deployment
 - live mode for Studionet once a contract address is configured
+- a regulatory submission packet export for post-resolution reporting
 
 ## GenLayer network notes
 

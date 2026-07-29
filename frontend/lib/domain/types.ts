@@ -70,3 +70,13 @@ export type TransactionState = {
   detail?: string;
 };
 
+export type RegulatoryPacket = {
+  coverTitle: string;
+  executiveSummary: string;
+  jurisdictionNote: string;
+  proceduralHistory: string[];
+  evidenceIndex: string[];
+  findings: string[];
+  resolutionBasis: string[];
+  postResolutionActions: string[];
+};

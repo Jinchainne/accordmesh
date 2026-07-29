@@ -191,6 +191,37 @@ export function Workspace() {
       </section>
 
       <section className="panel" style={{ marginBottom: 20 }}>
+        <div className="meta">
+          <span className="badge">Hackathon pitch</span>
+          <span>Public-facing product summary</span>
+        </div>
+        <h2>Why AccordMesh stands out</h2>
+        <div className="list">
+          <div className="stage-card">
+            <strong>Mediation-first AI workflow</strong>
+            <p>
+              The product does not jump straight to a verdict. It structures the record, surfaces
+              issues, and gives parties realistic settlement paths before closing the file.
+            </p>
+          </div>
+          <div className="stage-card">
+            <strong>Built for real operational disputes</strong>
+            <p>
+              Policy packs support freelance, marketplace, lending, and B2B service conflicts with
+              tailored intake prompts and evidence checklists.
+            </p>
+          </div>
+          <div className="stage-card">
+            <strong>Ready for downstream oversight</strong>
+            <p>
+              After resolution, the tool generates a structured regulatory packet that can be
+              forwarded to a trust team, ombuds office, or regulator.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel" style={{ marginBottom: 20 }}>
         <div className="kpis">
           <div className="kpi">
             <strong>{disputes.length}</strong>
@@ -270,6 +301,10 @@ export function Workspace() {
                 The same UI works in mock mode today and can switch to live GenLayer interactions
                 by setting the contract address and connecting a wallet.
               </div>
+              <div className="stage-card">
+                Resolved matters can be converted into a regulator-ready dossier instead of ending
+                as a dead-end app verdict.
+              </div>
             </div>
           </section>
         </div>
@@ -277,4 +312,3 @@ export function Workspace() {
     </main>
   );
 }
-

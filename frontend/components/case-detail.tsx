@@ -7,6 +7,7 @@ import type {
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
+  RegulatoryPacket,
   ResponseInput,
 } from "../lib/domain/types";
 
@@ -23,6 +24,52 @@ type CaseDetailProps = {
 
 function normalized(value: string) {
   return value.trim().toLowerCase();
+}
+
+function buildRegulatoryPacket(dispute: DisputeRecord): RegulatoryPacket {
+  return {
+    coverTitle: `Regulatory Submission Packet for Case ${dispute.id}`,
+    executiveSummary:
+      dispute.finalTerms ||
+      dispute.draftResolution ||
+      "This dispute file contains a structured record of the parties, evidence, analysis outputs, and proposed resolution path.",
+    jurisdictionNote:
+      "Prepared as a neutral digital casework dossier for downstream review by a regulator, marketplace trust team, ombuds office, or oversight body.",
+    proceduralHistory: [
+      `Case filed under ${dispute.caseType}.`,
+      "Claimant statement and supporting links were recorded.",
+      dispute.respondentStatement
+        ? "Respondent statement and supporting links were recorded."
+        : "Respondent statement was not recorded in the current file.",
+      dispute.issueMap
+        ? "Issue mapping and credibility review were generated."
+        : "Issue mapping has not yet been generated.",
+      Object.keys(dispute.mediationPositions).length
+        ? "Mediation positions were captured from one or more parties."
+        : "No mediation position has been recorded in the current file.",
+      dispute.finalTerms
+        ? "Final terms were published and the matter reached a resolved state."
+        : "Final terms have not yet been published.",
+    ],
+    evidenceIndex: [
+      ...dispute.claimantEvidenceUrls.map((url, index) => `Claimant Exhibit C-${index + 1}: ${url}`),
+      ...dispute.respondentEvidenceUrls.map(
+        (url, index) => `Respondent Exhibit R-${index + 1}: ${url}`,
+      ),
+    ],
+    findings: [
+      dispute.issueMap || "No issue map available.",
+      dispute.credibilityNotes || "No credibility notes available.",
+    ],
+    resolutionBasis: dispute.settlementOptions.length
+      ? dispute.settlementOptions
+      : [dispute.draftResolution || "No settlement or resolution basis available."],
+    postResolutionActions: [
+      dispute.finalTerms || "Publish enforceable final terms.",
+      "Preserve evidence links and timeline records for third-party review.",
+      "Attach any payment, refund, or compliance confirmation generated after resolution.",
+    ],
+  };
 }
 
 export function CaseDetail({
@@ -57,6 +104,7 @@ export function CaseDetail({
   const isRespondent = current !== "" && current === normalized(currentDispute.respondent);
   const isOperator = current !== "" && current === normalized(operator);
   const policyPack = getPolicyPack(currentDispute.caseType);
+  const regulatoryPacket = buildRegulatoryPacket(currentDispute);
 
   function exportCasePackage() {
     const payload = [
@@ -94,6 +142,43 @@ export function CaseDetail({
     URL.revokeObjectURL(url);
   }
 
+  function exportRegulatoryPacket() {
+    const payload = [
+      regulatoryPacket.coverTitle,
+      "",
+      "Executive Summary",
+      regulatoryPacket.executiveSummary,
+      "",
+      "Jurisdiction Note",
+      regulatoryPacket.jurisdictionNote,
+      "",
+      "Procedural History",
+      ...regulatoryPacket.proceduralHistory.map((line) => `- ${line}`),
+      "",
+      "Evidence Index",
+      ...(regulatoryPacket.evidenceIndex.length
+        ? regulatoryPacket.evidenceIndex.map((line) => `- ${line}`)
+        : ["- No evidence links recorded."]),
+      "",
+      "Findings",
+      ...regulatoryPacket.findings.map((line) => `- ${line}`),
+      "",
+      "Resolution Basis",
+      ...regulatoryPacket.resolutionBasis.map((line) => `- ${line}`),
+      "",
+      "Post-Resolution Actions",
+      ...regulatoryPacket.postResolutionActions.map((line) => `- ${line}`),
+    ].join("\n");
+
+    const blob = new Blob([payload], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `accordmesh-regulatory-packet-${currentDispute.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function run(task: () => Promise<void>) {
     startTransition(async () => {
       await task();
@@ -114,6 +199,9 @@ export function CaseDetail({
       <div className="actions-row">
         <button className="button secondary" type="button" onClick={exportCasePackage}>
           Export case package
+        </button>
+        <button className="button secondary" type="button" onClick={exportRegulatoryPacket}>
+          Export regulatory packet
         </button>
       </div>
 
@@ -225,6 +313,29 @@ export function CaseDetail({
         <div className="stage-card">
           <h3>Draft resolution memo</h3>
           <p>{dispute.draftResolution || "No draft resolution published yet."}</p>
+        </div>
+
+        <div className="stage-card">
+          <h3>Regulatory submission packet</h3>
+          <p>{regulatoryPacket.executiveSummary}</p>
+          <div className="two-col compact-two-col">
+            <div>
+              <strong>Procedural history</strong>
+              <ul className="plain-list">
+                {regulatoryPacket.proceduralHistory.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <strong>Post-resolution actions</strong>
+              <ul className="plain-list">
+                {regulatoryPacket.postResolutionActions.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
 
         <div className="stage-card">
