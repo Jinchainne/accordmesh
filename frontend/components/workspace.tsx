@@ -210,10 +210,12 @@ export function Workspace() {
       return;
     }
 
+    const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
     const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
+    setWalletAddress(accounts[0] ?? connectedAddress ?? "");
     setChainId((current) => current || nextChainId || "");
     setWalletMessage(
-      connectedAddress
+      (accounts[0] ?? connectedAddress)
         ? "Wallet connected and ready to sign GenLayer transactions."
         : "Wallet detected. Connect MetaMask to sign transactions.",
     );
@@ -305,6 +307,33 @@ export function Workspace() {
         setWalletMessage("Choose a wallet in the connect modal.");
         openConnectModal();
         return;
+      }
+
+      const provider = getBrowserProvider();
+      if (provider) {
+        try {
+          setWalletMessage("Requesting wallet access...");
+          const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+          const nextAddress = accounts[0] ?? "";
+
+          if (nextAddress) {
+            setWalletAddress(nextAddress);
+            await prepareConnectedWallet(nextAddress);
+            return;
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Wallet access request failed.";
+          setWalletMessage(message);
+          setWalletDiagnostics((current) => [
+            ...current.filter((item) => item.label !== "Connect step"),
+            {
+              label: "Connect step",
+              value: message,
+              tone: "danger",
+            },
+          ]);
+          return;
+        }
       }
 
       setWalletMessage("Connect modal is unavailable. Reload and try again.");
