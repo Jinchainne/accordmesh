@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { getPolicyPack, policyPacks } from "../lib/domain/policy-packs";
 import type { NewDisputeInput } from "../lib/domain/types";
+import { EvidenceUploader } from "./evidence-uploader";
 
 const initialState: NewDisputeInput = {
   caseType: "Freelance delivery",
@@ -34,13 +35,26 @@ export function DisputeWizard({ disabled, onCreate }: DisputeWizardProps) {
     });
   }
 
+  function appendEvidence(urls: string[]) {
+    setForm((current) => ({
+      ...current,
+      evidenceUrls: [current.evidenceUrls, ...urls].filter(Boolean).join(", "),
+    }));
+  }
+
   return (
-    <section className="panel">
-      <div className="meta">
-        <span className="badge">Intake</span>
-        <span>File a structured dispute record</span>
+    <section className="panel panel-heavy">
+      <div className="section-top">
+        <div>
+          <span className="eyebrow dark">Claim Intake</span>
+          <h2>File a dispute with a lawyer-style intake pack</h2>
+        </div>
+        <p>
+          Capture the facts, counterparties, and evidence trail in a format that can move from
+          intake to mediation, appeal, and regulatory review.
+        </p>
       </div>
-      <h2>Open a dispute</h2>
+
       <form className="form" onSubmit={onSubmit}>
         <div className="field">
           <label htmlFor="caseType">Dispute type</label>
@@ -55,12 +69,15 @@ export function DisputeWizard({ disabled, onCreate }: DisputeWizardProps) {
           </select>
         </div>
 
-        <div className="stage-card">
-          <h3>{activePack.label} policy pack</h3>
+        <div className="briefing-card">
+          <div>
+            <span className="mini-kicker">{activePack.label}</span>
+            <h3>Intake blueprint</h3>
+          </div>
           <p>{activePack.summary}</p>
           <div className="two-col compact-two-col">
             <div>
-              <strong>Intake prompts</strong>
+              <strong>Questions to answer</strong>
               <ul className="plain-list">
                 {activePack.intakePrompts.map((prompt) => (
                   <li key={prompt}>{prompt}</li>
@@ -68,7 +85,7 @@ export function DisputeWizard({ disabled, onCreate }: DisputeWizardProps) {
               </ul>
             </div>
             <div>
-              <strong>Evidence checklist</strong>
+              <strong>Evidence expected</strong>
               <ul className="plain-list">
                 {activePack.requiredEvidence.map((item) => (
                   <li key={item}>{item}</li>
@@ -106,18 +123,20 @@ export function DisputeWizard({ disabled, onCreate }: DisputeWizardProps) {
             id="claimantStatement"
             value={form.claimantStatement}
             onChange={(event) => update("claimantStatement", event.target.value)}
-            placeholder="Explain the agreement, the conduct in dispute, the evidence you have, and the remedy you want."
+            placeholder="Explain the agreement, the conduct in dispute, the strongest evidence, and the remedy requested."
             required
           />
         </div>
 
+        <EvidenceUploader disabled={disabled || isPending} onUploaded={appendEvidence} />
+
         <div className="field">
           <label htmlFor="evidenceUrls">Evidence URLs</label>
-          <input
+          <textarea
             id="evidenceUrls"
             value={form.evidenceUrls}
             onChange={(event) => update("evidenceUrls", event.target.value)}
-            placeholder="https://drive..., https://notion..., https://ipfs..."
+            placeholder="Uploaded links or external archive URLs"
           />
         </div>
 

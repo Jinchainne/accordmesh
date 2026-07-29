@@ -4,12 +4,17 @@ import { useState, useTransition } from "react";
 import { getCaseReadiness, getStageLabel } from "../lib/domain/derived";
 import { getPolicyPack } from "../lib/domain/policy-packs";
 import type {
+  AppealReviewInput,
+  AppealInput,
+  AssignRoleInput,
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
   RegulatoryPacket,
   ResponseInput,
+  RoleName,
 } from "../lib/domain/types";
+import { EvidenceUploader } from "./evidence-uploader";
 
 type CaseDetailProps = {
   dispute: DisputeRecord | null;
@@ -20,6 +25,9 @@ type CaseDetailProps = {
   onAnalyze(caseId: string): Promise<void>;
   onMediation(input: MediationInput): Promise<void>;
   onFinalize(input: FinalTermsInput): Promise<void>;
+  onAssignRole(input: AssignRoleInput): Promise<void>;
+  onSubmitAppeal(input: AppealInput): Promise<void>;
+  onReviewAppeal(input: AppealReviewInput): Promise<void>;
 };
 
 function normalized(value: string) {
@@ -67,9 +75,18 @@ function buildRegulatoryPacket(dispute: DisputeRecord): RegulatoryPacket {
     postResolutionActions: [
       dispute.finalTerms || "Publish enforceable final terms.",
       "Preserve evidence links and timeline records for third-party review.",
-      "Attach any payment, refund, or compliance confirmation generated after resolution.",
+      "Attach payment, refund, or compliance confirmation generated after resolution.",
     ],
   };
+}
+
+function isCaseParticipant(dispute: DisputeRecord, actor: string) {
+  const current = normalized(actor);
+  if (!current) return false;
+
+  return Object.values(dispute.roles).some((addresses) =>
+    addresses.some((address) => normalized(address) === current),
+  );
 }
 
 export function CaseDetail({
@@ -81,17 +98,28 @@ export function CaseDetail({
   onAnalyze,
   onMediation,
   onFinalize,
+  onAssignRole,
+  onSubmitAppeal,
+  onReviewAppeal,
 }: CaseDetailProps) {
   const [responseStatement, setResponseStatement] = useState("");
   const [responseEvidence, setResponseEvidence] = useState("");
   const [mediationOption, setMediationOption] = useState<MediationInput["option"]>("A");
   const [mediationRationale, setMediationRationale] = useState("");
   const [finalTerms, setFinalTerms] = useState("");
+  const [role, setRole] = useState<Exclude<RoleName, "claimant" | "respondent">>("counsel");
+  const [roleAssignee, setRoleAssignee] = useState("");
+  const [appealAction, setAppealAction] = useState("Reopen mediation");
+  const [appealRationale, setAppealRationale] = useState("");
+  const [appealEvidence, setAppealEvidence] = useState("");
+  const [reviewDisposition, setReviewDisposition] =
+    useState<AppealReviewInput["disposition"]>("UPHELD");
+  const [reviewMemo, setReviewMemo] = useState("");
   const [isPending, startTransition] = useTransition();
 
   if (!dispute) {
     return (
-      <section className="panel">
+      <section className="panel panel-heavy">
         <h2>No case selected</h2>
         <p>Select a dispute from the board to inspect its current record and available actions.</p>
       </section>
@@ -103,6 +131,11 @@ export function CaseDetail({
   const isClaimant = current !== "" && current === normalized(currentDispute.claimant);
   const isRespondent = current !== "" && current === normalized(currentDispute.respondent);
   const isOperator = current !== "" && current === normalized(operator);
+  const isReviewer =
+    currentDispute.roles.reviewer.some((address) => normalized(address) === current) || isOperator;
+  const isRegulator =
+    currentDispute.roles.regulator.some((address) => normalized(address) === current) || isOperator;
+  const canAppeal = currentDispute.stage === "RESOLVED" && isCaseParticipant(currentDispute, connectedAddress);
   const policyPack = getPolicyPack(currentDispute.caseType);
   const regulatoryPacket = buildRegulatoryPacket(currentDispute);
 
@@ -179,23 +212,71 @@ export function CaseDetail({
     URL.revokeObjectURL(url);
   }
 
+  function openDecisionMemo() {
+    const popup = window.open("", "_blank", "width=1080,height=920");
+    if (!popup) return;
+
+    popup.document.write(`
+      <html>
+        <head>
+          <title>AccordMesh Decision Memo</title>
+          <style>
+            body { font-family: Georgia, serif; margin: 48px; color: #1d2430; background: #fffdf8; }
+            h1,h2 { margin-bottom: 8px; }
+            .meta { color: #6b7280; margin-bottom: 24px; }
+            .block { margin-bottom: 24px; page-break-inside: avoid; }
+            .card { border: 1px solid #d7d2c8; border-radius: 16px; padding: 18px; background: #fff; }
+            ul { line-height: 1.6; }
+          </style>
+        </head>
+        <body>
+          <h1>${currentDispute.title}</h1>
+          <div class="meta">Case ${currentDispute.id} · ${currentDispute.caseType} · ${getStageLabel(currentDispute.stage)}</div>
+          <div class="block card"><h2>Executive Summary</h2><p>${regulatoryPacket.executiveSummary}</p></div>
+          <div class="block card"><h2>Issue Map</h2><p>${currentDispute.issueMap || "Not available"}</p></div>
+          <div class="block card"><h2>Decision Basis</h2><p>${currentDispute.draftResolution || currentDispute.finalTerms || "Not available"}</p></div>
+          <div class="block card"><h2>Final Terms</h2><p>${currentDispute.finalTerms || "Not published"}</p></div>
+          <div class="block card"><h2>Evidence Index</h2><ul>${regulatoryPacket.evidenceIndex.map((item) => `<li>${item}</li>`).join("")}</ul></div>
+          <script>window.onload = () => window.print()</script>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  }
+
   function run(task: () => Promise<void>) {
     startTransition(async () => {
       await task();
     });
   }
 
+  function appendResponseEvidence(urls: string[]) {
+    setResponseEvidence((currentValue) => [currentValue, ...urls].filter(Boolean).join(", "));
+  }
+
+  function appendAppealEvidence(urls: string[]) {
+    setAppealEvidence((currentValue) => [currentValue, ...urls].filter(Boolean).join(", "));
+  }
+
   return (
-    <section className="panel">
-      <div className="meta">
-        <span className="badge warn">{dispute.caseType}</span>
-        <span>Case #{dispute.id}</span>
-        <span>Readiness {getCaseReadiness(dispute)}%</span>
+    <section className="panel panel-heavy">
+      <div className="case-header">
+        <div>
+          <span className="eyebrow dark">{currentDispute.caseType}</span>
+          <h2>{currentDispute.title}</h2>
+        </div>
+        <div className="score-badge">
+          <strong>{getCaseReadiness(currentDispute)}%</strong>
+          <span>Readiness</span>
+        </div>
       </div>
-      <h2>{dispute.title}</h2>
-      <p>
-        <strong>Stage:</strong> {getStageLabel(dispute.stage)}
-      </p>
+
+      <div className="meta large-meta">
+        <span>Case #{currentDispute.id}</span>
+        <span>{getStageLabel(currentDispute.stage)}</span>
+        <span>Appeals {currentDispute.appeals.length}</span>
+      </div>
+
       <div className="actions-row">
         <button className="button secondary" type="button" onClick={exportCasePackage}>
           Export case package
@@ -203,11 +284,17 @@ export function CaseDetail({
         <button className="button secondary" type="button" onClick={exportRegulatoryPacket}>
           Export regulatory packet
         </button>
+        <button className="button secondary" type="button" onClick={openDecisionMemo}>
+          Open PDF-ready memo
+        </button>
       </div>
 
       <div className="stack">
-        <div className="stage-card">
-          <h3>Policy pack guidance</h3>
+        <div className="briefing-card">
+          <div>
+            <span className="mini-kicker">Policy guidance</span>
+            <h3>{policyPack.label}</h3>
+          </div>
           <p>{policyPack.summary}</p>
           <div className="two-col compact-two-col">
             <div>
@@ -229,33 +316,91 @@ export function CaseDetail({
           </div>
         </div>
 
-        <div className="stage-card">
-          <h3>Parties</h3>
-          <p>
-            <strong>Claimant:</strong> <span className="mono">{dispute.claimant}</span>
-          </p>
-          <p>
-            <strong>Respondent:</strong> <span className="mono">{dispute.respondent}</span>
-          </p>
+        <div className="three-col">
+          <div className="stage-card">
+            <h3>Claimant</h3>
+            <p className="mono">{currentDispute.claimant}</p>
+          </div>
+          <div className="stage-card">
+            <h3>Respondent</h3>
+            <p className="mono">{currentDispute.respondent}</p>
+          </div>
+          <div className="stage-card">
+            <h3>Operator</h3>
+            <p className="mono">{operator || "Unbound"}</p>
+          </div>
         </div>
 
-        <div className="stage-card">
-          <h3>Statements</h3>
-          <p>
-            <strong>Claimant:</strong> {dispute.claimantStatement}
-          </p>
-          <p>
-            <strong>Respondent:</strong>{" "}
-            {dispute.respondentStatement || "No response has been filed yet."}
-          </p>
+        <div className="role-grid">
+          {(["counsel", "reviewer", "regulator"] as const).map((roleName) => (
+            <div className="stage-card" key={roleName}>
+              <h3>{roleName}</h3>
+              <ul className="plain-list">
+                {currentDispute.roles[roleName].length ? (
+                  currentDispute.roles[roleName].map((address) => (
+                    <li className="mono" key={address}>
+                      {address}
+                    </li>
+                  ))
+                ) : (
+                  <li>No assignees yet.</li>
+                )}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {isOperator ? (
+          <div className="stage-card">
+            <h3>Assign specialist role</h3>
+            <div className="inline-form">
+              <select value={role} onChange={(event) => setRole(event.target.value as typeof role)}>
+                <option value="counsel">Counsel</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="regulator">Regulator</option>
+              </select>
+              <input
+                value={roleAssignee}
+                onChange={(event) => setRoleAssignee(event.target.value)}
+                placeholder="0x..."
+              />
+              <button
+                className="button"
+                type="button"
+                disabled={busy || isPending || !roleAssignee.trim()}
+                onClick={() =>
+                  run(() =>
+                    onAssignRole({
+                      caseId: currentDispute.id,
+                      role,
+                      assignee: roleAssignee,
+                    }),
+                  )
+                }
+              >
+                Assign
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="two-col">
+          <div className="stage-card">
+            <h3>Claimant statement</h3>
+            <p>{currentDispute.claimantStatement}</p>
+          </div>
+          <div className="stage-card">
+            <h3>Respondent statement</h3>
+            <p>{currentDispute.respondentStatement || "No response has been filed yet."}</p>
+          </div>
         </div>
 
         <div className="two-col">
           <div className="stage-card">
             <h3>Claimant evidence</h3>
             <ul className="plain-list">
-              {dispute.claimantEvidenceUrls.length ? (
-                dispute.claimantEvidenceUrls.map((url) => (
+              {currentDispute.claimantEvidenceUrls.length ? (
+                currentDispute.claimantEvidenceUrls.map((url) => (
                   <li key={url}>
                     <a href={url} target="_blank" rel="noreferrer">
                       {url}
@@ -270,8 +415,8 @@ export function CaseDetail({
           <div className="stage-card">
             <h3>Respondent evidence</h3>
             <ul className="plain-list">
-              {dispute.respondentEvidenceUrls.length ? (
-                dispute.respondentEvidenceUrls.map((url) => (
+              {currentDispute.respondentEvidenceUrls.length ? (
+                currentDispute.respondentEvidenceUrls.map((url) => (
                   <li key={url}>
                     <a href={url} target="_blank" rel="noreferrer">
                       {url}
@@ -285,21 +430,22 @@ export function CaseDetail({
           </div>
         </div>
 
-        <div className="stage-card">
-          <h3>Issue map</h3>
-          <p>{dispute.issueMap || "Run analysis once both sides have submitted the record."}</p>
-        </div>
-
-        <div className="stage-card">
-          <h3>Credibility notes</h3>
-          <p>{dispute.credibilityNotes || "No analysis has been published yet."}</p>
+        <div className="two-col">
+          <div className="stage-card">
+            <h3>Issue map</h3>
+            <p>{currentDispute.issueMap || "Run analysis once both sides have submitted the record."}</p>
+          </div>
+          <div className="stage-card">
+            <h3>Credibility notes</h3>
+            <p>{currentDispute.credibilityNotes || "No analysis has been published yet."}</p>
+          </div>
         </div>
 
         <div className="stage-card">
           <h3>Settlement options</h3>
           <div className="option-list">
-            {dispute.settlementOptions.length ? (
-              dispute.settlementOptions.map((option) => (
+            {currentDispute.settlementOptions.length ? (
+              currentDispute.settlementOptions.map((option) => (
                 <div className="option-card" key={option}>
                   {option}
                 </div>
@@ -311,12 +457,7 @@ export function CaseDetail({
         </div>
 
         <div className="stage-card">
-          <h3>Draft resolution memo</h3>
-          <p>{dispute.draftResolution || "No draft resolution published yet."}</p>
-        </div>
-
-        <div className="stage-card">
-          <h3>Regulatory submission packet</h3>
+          <h3>Resolution and regulatory follow-through</h3>
           <p>{regulatoryPacket.executiveSummary}</p>
           <div className="two-col compact-two-col">
             <div>
@@ -339,29 +480,90 @@ export function CaseDetail({
         </div>
 
         <div className="stage-card">
-          <h3>Mediation positions</h3>
-          <ul className="plain-list">
-            {Object.entries(dispute.mediationPositions).length ? (
-              Object.entries(dispute.mediationPositions).map(([party, position]) => (
-                <li key={party}>
-                  <span className="mono">{party}</span> chose <strong>{position.option}</strong>:{" "}
-                  {position.rationale}
-                </li>
+          <h3>Appeals</h3>
+          <div className="list">
+            {currentDispute.appeals.length ? (
+              currentDispute.appeals.map((appeal, index) => (
+                <div className="appeal-card" key={`${appeal.submittedBy}-${index}`}>
+                  <div className="meta">
+                    <span className="badge">{appeal.status}</span>
+                    <span className="mono">{appeal.submittedBy}</span>
+                  </div>
+                  <strong>{appeal.requestedAction}</strong>
+                  <p>{appeal.rationale}</p>
+                  {appeal.evidenceUrls.length ? (
+                    <ul className="plain-list">
+                      {appeal.evidenceUrls.map((url) => (
+                        <li key={url}>
+                          <a href={url} target="_blank" rel="noreferrer">
+                            {url}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {appeal.reviewMemo ? (
+                    <p>
+                      <strong>Review memo:</strong> {appeal.reviewMemo}
+                    </p>
+                  ) : null}
+                  {(isReviewer || isRegulator) && appeal.status === "PENDING_REVIEW" ? (
+                    <div className="form">
+                      <div className="field">
+                        <label>Disposition</label>
+                        <select
+                          value={reviewDisposition}
+                          onChange={(event) =>
+                            setReviewDisposition(event.target.value as AppealReviewInput["disposition"])
+                          }
+                        >
+                          <option value="UPHELD">UPHELD</option>
+                          <option value="REOPENED">REOPENED</option>
+                          <option value="MODIFIED_TERMS">MODIFIED_TERMS</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Review memo</label>
+                        <textarea
+                          value={reviewMemo}
+                          onChange={(event) => setReviewMemo(event.target.value)}
+                        />
+                      </div>
+                      <button
+                        className="button"
+                        type="button"
+                        disabled={busy || isPending || !reviewMemo.trim()}
+                        onClick={() =>
+                          run(() =>
+                            onReviewAppeal({
+                              caseId: currentDispute.id,
+                              appealIndex: index,
+                              disposition: reviewDisposition,
+                              reviewMemo,
+                            }),
+                          )
+                        }
+                      >
+                        Review appeal
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ))
             ) : (
-              <li>No party positions have been recorded yet.</li>
+              <div className="option-card">No appeals have been filed yet.</div>
             )}
-          </ul>
+          </div>
         </div>
 
-        {dispute.finalTerms ? (
+        {currentDispute.finalTerms ? (
           <div className="stage-card">
             <h3>Final terms</h3>
-            <p>{dispute.finalTerms}</p>
+            <p>{currentDispute.finalTerms}</p>
           </div>
         ) : null}
 
-        {dispute.stage === "RESPONSE_PENDING" && isRespondent ? (
+        {currentDispute.stage === "RESPONSE_PENDING" && isRespondent ? (
           <div className="stage-card">
             <h3>Submit respondent response</h3>
             <div className="form">
@@ -373,13 +575,13 @@ export function CaseDetail({
                   onChange={(event) => setResponseStatement(event.target.value)}
                 />
               </div>
+              <EvidenceUploader disabled={busy || isPending} onUploaded={appendResponseEvidence} />
               <div className="field">
                 <label htmlFor="responseEvidence">Evidence URLs</label>
-                <input
+                <textarea
                   id="responseEvidence"
                   value={responseEvidence}
                   onChange={(event) => setResponseEvidence(event.target.value)}
-                  placeholder="https://..."
                 />
               </div>
               <button
@@ -389,7 +591,7 @@ export function CaseDetail({
                 onClick={() =>
                   run(() =>
                     onRespond({
-                      caseId: dispute.id,
+                      caseId: currentDispute.id,
                       respondentStatement: responseStatement,
                       evidenceUrls: responseEvidence,
                     }),
@@ -402,25 +604,25 @@ export function CaseDetail({
           </div>
         ) : null}
 
-        {dispute.stage === "ANALYSIS_READY" ? (
+        {currentDispute.stage === "ANALYSIS_READY" ? (
           <div className="stage-card">
             <h3>Run AI analysis</h3>
             <p>
-              This calls the contract&apos;s GenLayer analysis step to create the issue map,
-              credibility notes, and mediation options.
+              This runs the issue map, credibility notes, and settlement-path generation on
+              GenLayer.
             </p>
             <button
               className="button"
               type="button"
               disabled={busy || isPending || current === ""}
-              onClick={() => run(() => onAnalyze(dispute.id))}
+              onClick={() => run(() => onAnalyze(currentDispute.id))}
             >
               Analyze case
             </button>
           </div>
         ) : null}
 
-        {dispute.stage === "MEDIATION_OPEN" && (isClaimant || isRespondent) ? (
+        {currentDispute.stage === "MEDIATION_OPEN" && (isClaimant || isRespondent) ? (
           <div className="stage-card">
             <h3>Record mediation position</h3>
             <div className="form">
@@ -454,7 +656,7 @@ export function CaseDetail({
                 onClick={() =>
                   run(() =>
                     onMediation({
-                      caseId: dispute.id,
+                      caseId: currentDispute.id,
                       option: mediationOption,
                       rationale: mediationRationale,
                     }),
@@ -467,7 +669,7 @@ export function CaseDetail({
           </div>
         ) : null}
 
-        {dispute.stage === "MEDIATION_OPEN" && isOperator ? (
+        {currentDispute.stage === "MEDIATION_OPEN" && isOperator ? (
           <div className="stage-card">
             <h3>Publish final terms</h3>
             <div className="form">
@@ -487,13 +689,61 @@ export function CaseDetail({
                 onClick={() =>
                   run(() =>
                     onFinalize({
-                      caseId: dispute.id,
+                      caseId: currentDispute.id,
                       finalTerms,
                     }),
                   )
                 }
               >
                 Publish final terms
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {canAppeal ? (
+          <div className="stage-card">
+            <h3>File appeal or oversight request</h3>
+            <div className="form">
+              <div className="field">
+                <label>Requested action</label>
+                <input
+                  value={appealAction}
+                  onChange={(event) => setAppealAction(event.target.value)}
+                  placeholder="Reopen mediation"
+                />
+              </div>
+              <div className="field">
+                <label>Rationale</label>
+                <textarea
+                  value={appealRationale}
+                  onChange={(event) => setAppealRationale(event.target.value)}
+                />
+              </div>
+              <EvidenceUploader disabled={busy || isPending} onUploaded={appendAppealEvidence} />
+              <div className="field">
+                <label>Appeal evidence URLs</label>
+                <textarea
+                  value={appealEvidence}
+                  onChange={(event) => setAppealEvidence(event.target.value)}
+                />
+              </div>
+              <button
+                className="button"
+                type="button"
+                disabled={busy || isPending || !appealRationale.trim() || !appealAction.trim()}
+                onClick={() =>
+                  run(() =>
+                    onSubmitAppeal({
+                      caseId: currentDispute.id,
+                      requestedAction: appealAction,
+                      rationale: appealRationale,
+                      evidenceUrls: appealEvidence,
+                    }),
+                  )
+                }
+              >
+                Submit appeal
               </button>
             </div>
           </div>

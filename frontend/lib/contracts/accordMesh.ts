@@ -4,6 +4,9 @@ import { appConfig } from "../genlayer/config";
 import { createReadClient, createWriteClient } from "../genlayer/client";
 import { getBrowserProvider } from "../genlayer/wallet";
 import type {
+  AppealReviewInput,
+  AppealInput,
+  AssignRoleInput,
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
@@ -51,6 +54,27 @@ function normalizeRecord(record: Record<string, unknown>): DisputeRecord {
     ? record.respondent_evidence_urls.map(String)
     : [];
   const mediationPositions = (record.mediation_positions ?? {}) as DisputeRecord["mediationPositions"];
+  const roles = (record.roles ?? {
+    claimant: [],
+    respondent: [],
+    counsel: [],
+    reviewer: [],
+    regulator: [],
+  }) as DisputeRecord["roles"];
+  const appeals = Array.isArray(record.appeals)
+    ? record.appeals.map((appeal) => {
+        const parsed = appeal as Record<string, unknown>;
+        return {
+          submittedBy: String(parsed.submitted_by ?? ""),
+          requestedAction: String(parsed.requested_action ?? ""),
+          rationale: String(parsed.rationale ?? ""),
+          evidenceUrls: Array.isArray(parsed.evidence_urls) ? parsed.evidence_urls.map(String) : [],
+          status: String(parsed.status ?? "PENDING_REVIEW") as DisputeRecord["appeals"][number]["status"],
+          reviewMemo: String(parsed.review_memo ?? ""),
+          reviewedBy: String(parsed.reviewed_by ?? ""),
+        };
+      })
+    : [];
 
   return {
     id: String(record.id ?? ""),
@@ -73,6 +97,8 @@ function normalizeRecord(record: Record<string, unknown>): DisputeRecord {
     draftResolution: String(record.draft_resolution ?? ""),
     mediationPositions,
     finalTerms: String(record.final_terms ?? ""),
+    roles,
+    appeals,
   };
 }
 
@@ -88,6 +114,13 @@ async function waitForReceipt(hash: string) {
     executionResultName: receipt.txExecutionResultName,
     statusName: receipt.statusName,
   };
+}
+
+async function getWriteClient(address?: string) {
+  const provider = requireProvider();
+  const writeClient = createWriteClient(requireWalletAddress(address), provider);
+  await writeClient.connect(appConfig.networkName as never);
+  return writeClient;
 }
 
 export class AccordMeshContractClient {
@@ -147,10 +180,7 @@ export class AccordMeshContractClient {
   }
 
   async fileDispute(input: NewDisputeInput, address?: string): Promise<ContractActionResult> {
-    const provider = requireProvider();
-    const writeClient = createWriteClient(requireWalletAddress(address), provider);
-    await writeClient.connect(appConfig.networkName as never);
-
+    const writeClient = await getWriteClient(address);
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "file_dispute",
@@ -163,67 +193,83 @@ export class AccordMeshContractClient {
       ],
       value: BigInt(0),
     });
-
     return waitForReceipt(String(hash));
   }
 
   async submitResponse(input: ResponseInput, address?: string): Promise<ContractActionResult> {
-    const provider = requireProvider();
-    const writeClient = createWriteClient(requireWalletAddress(address), provider);
-    await writeClient.connect(appConfig.networkName as never);
-
+    const writeClient = await getWriteClient(address);
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "submit_response",
       args: [BigInt(input.caseId), input.respondentStatement, input.evidenceUrls],
       value: BigInt(0),
     });
-
     return waitForReceipt(String(hash));
   }
 
   async analyzeCase(caseId: string, address?: string): Promise<ContractActionResult> {
-    const provider = requireProvider();
-    const writeClient = createWriteClient(requireWalletAddress(address), provider);
-    await writeClient.connect(appConfig.networkName as never);
-
+    const writeClient = await getWriteClient(address);
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "analyze_case",
       args: [BigInt(caseId)],
       value: BigInt(0),
     });
-
     return waitForReceipt(String(hash));
   }
 
   async recordMediation(input: MediationInput, address?: string): Promise<ContractActionResult> {
-    const provider = requireProvider();
-    const writeClient = createWriteClient(requireWalletAddress(address), provider);
-    await writeClient.connect(appConfig.networkName as never);
-
+    const writeClient = await getWriteClient(address);
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "record_mediation_position",
       args: [BigInt(input.caseId), input.option, input.rationale],
       value: BigInt(0),
     });
+    return waitForReceipt(String(hash));
+  }
 
+  async assignRole(input: AssignRoleInput, address?: string): Promise<ContractActionResult> {
+    const writeClient = await getWriteClient(address);
+    const hash = await writeClient.writeContract({
+      address: requireContractAddress(),
+      functionName: "assign_case_role",
+      args: [BigInt(input.caseId), input.role, input.assignee],
+      value: BigInt(0),
+    });
+    return waitForReceipt(String(hash));
+  }
+
+  async submitAppeal(input: AppealInput, address?: string): Promise<ContractActionResult> {
+    const writeClient = await getWriteClient(address);
+    const hash = await writeClient.writeContract({
+      address: requireContractAddress(),
+      functionName: "submit_appeal",
+      args: [BigInt(input.caseId), input.requestedAction, input.rationale, input.evidenceUrls],
+      value: BigInt(0),
+    });
+    return waitForReceipt(String(hash));
+  }
+
+  async reviewAppeal(input: AppealReviewInput, address?: string): Promise<ContractActionResult> {
+    const writeClient = await getWriteClient(address);
+    const hash = await writeClient.writeContract({
+      address: requireContractAddress(),
+      functionName: "review_appeal",
+      args: [BigInt(input.caseId), BigInt(input.appealIndex), input.disposition, input.reviewMemo],
+      value: BigInt(0),
+    });
     return waitForReceipt(String(hash));
   }
 
   async publishFinalTerms(input: FinalTermsInput, address?: string): Promise<ContractActionResult> {
-    const provider = requireProvider();
-    const writeClient = createWriteClient(requireWalletAddress(address), provider);
-    await writeClient.connect(appConfig.networkName as never);
-
+    const writeClient = await getWriteClient(address);
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "publish_final_terms",
       args: [BigInt(input.caseId), input.finalTerms],
       value: BigInt(0),
     });
-
     return waitForReceipt(String(hash));
   }
 }

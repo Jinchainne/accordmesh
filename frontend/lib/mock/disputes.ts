@@ -1,10 +1,39 @@
-import type { DisputeRecord, MediationOptionKey, PlatformConfig } from "../domain/types";
+import type {
+  AppealRecord,
+  CaseRoles,
+  DisputeRecord,
+  MediationOptionKey,
+  PlatformConfig,
+} from "../domain/types";
 
 export const mockPlatformConfig: PlatformConfig = {
   platformName: "AccordMesh",
   rulesUri: "ipfs://community-rules",
   operator: "0xA11c...0Per",
 };
+
+function makeRoles(claimant: string, respondent: string): CaseRoles {
+  return {
+    claimant: [claimant],
+    respondent: [respondent],
+    counsel: ["0xC0unsel...77A1"],
+    reviewer: ["0xRev1...4A21"],
+    regulator: ["0xRegu...1188"],
+  };
+}
+
+function makeAppeal(overrides?: Partial<AppealRecord>): AppealRecord {
+  return {
+    submittedBy: "0x3d1d...a1b9",
+    requestedAction: "Reopen mediation and narrow the remaining handoff scope.",
+    rationale: "The final terms did not account for a later acceptance message and a corrected delivery archive.",
+    evidenceUrls: ["https://ipfs.io/ipfs/bafybeiappeal1"],
+    status: "PENDING_REVIEW",
+    reviewMemo: "",
+    reviewedBy: "",
+    ...overrides,
+  };
+}
 
 export const mockDisputes: DisputeRecord[] = [
   {
@@ -19,12 +48,12 @@ export const mockDisputes: DisputeRecord[] = [
     respondentStatement:
       "Respondent says the delivered work did not satisfy the agreed conversion goals and that handoff assets were incomplete.",
     claimantEvidenceUrls: [
-      "https://notion.so/project-scope-v3",
+      "https://ipfs.io/ipfs/bafybeidesignscope",
       "https://drive.google.com/design-handoff",
     ],
     respondentEvidenceUrls: [
-      "https://docs.example/revision-notes",
-      "https://figma.com/file/qa-commentary",
+      "https://drive.google.com/revision-notes",
+      "https://ipfs.io/ipfs/bafybeiqa-commentary",
     ],
     issueMap:
       "1. Whether milestone acceptance occurred. 2. Whether revision scope exceeded contract language. 3. Whether delivery artifacts were materially incomplete.",
@@ -44,28 +73,47 @@ export const mockDisputes: DisputeRecord[] = [
       },
     },
     finalTerms: "",
+    roles: makeRoles("0x3D1d...A1b9", "0x8Ea0...4f20"),
+    appeals: [],
   },
   {
     id: "13",
     caseType: "Marketplace refund",
     title: "Collector item authenticity dispute",
-    stage: "RESPONSE_PENDING",
+    stage: "RESOLVED",
     claimant: "0xAa21...9d0C",
     respondent: "0x0b95...1F33",
     claimantStatement:
       "Claimant alleges the item description implied original manufacturer certification that was not present at delivery.",
-    respondentStatement: "",
+    respondentStatement:
+      "Respondent says the listing included close-up photos and that no certification was ever promised in writing.",
     claimantEvidenceUrls: [
-      "https://marketplace.example/order/13",
+      "https://drive.google.com/order-13",
       "https://ipfs.io/ipfs/bafybeicertificate-missing",
     ],
-    respondentEvidenceUrls: [],
-    issueMap: "",
-    credibilityNotes: "",
-    settlementOptions: [],
-    draftResolution: "",
+    respondentEvidenceUrls: ["https://ipfs.io/ipfs/bafybeilisting-archive"],
+    issueMap:
+      "1. Whether certification was expressly promised. 2. Whether the listing language created a reasonable authenticity expectation. 3. Whether return handling complied with marketplace policy.",
+    credibilityNotes:
+      "The file is strongest on listing screenshots and weakest on the post-delivery support timeline.",
+    settlementOptions: [
+      "Return-and-refund with tracked logistics.",
+      "Partial refund for diminished collectible value.",
+      "Independent authenticity review at shared cost.",
+    ],
+    draftResolution:
+      "A return-based remedy appears strongest if the listing language implied certification beyond the photographs themselves.",
     mediationPositions: {},
-    finalTerms: "",
+    finalTerms:
+      "Respondent shall accept return shipment within five business days and release a full refund upon confirmed receipt.",
+    roles: makeRoles("0xAa21...9d0C", "0x0b95...1F33"),
+    appeals: [
+      makeAppeal({
+        submittedBy: "0xAa21...9d0C",
+        requestedAction: "Modify terms to include shipping reimbursement.",
+        rationale: "The resolved terms omitted return-shipping costs even though the listing defect triggered the return.",
+      }),
+    ],
   },
 ];
 

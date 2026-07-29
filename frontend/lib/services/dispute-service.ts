@@ -7,6 +7,9 @@ import {
 import { isMockMode } from "../genlayer/config";
 import { AccordMeshContractClient, ExecutionResult } from "../contracts/accordMesh";
 import type {
+  AppealReviewInput,
+  AppealInput,
+  AssignRoleInput,
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
@@ -55,6 +58,15 @@ function assertSuccessfulExecution(executionResultName?: string) {
   }
 }
 
+function requireMockCase(caseId: string) {
+  const dispute = mockDisputes.find((item) => item.id === caseId);
+  if (!dispute) {
+    throw new Error("Case not found.");
+  }
+
+  return dispute;
+}
+
 export async function listDisputes(): Promise<DisputeRecord[]> {
   if (isMockMode) {
     loadMockDisputesFromStorage();
@@ -83,12 +95,13 @@ export async function getPlatformConfig(): Promise<PlatformConfig> {
 
 export async function createDispute(input: NewDisputeInput, actor?: string): Promise<string> {
   if (isMockMode) {
-    const created = {
+    const claimant = actor ?? "0xClaimant";
+    const created: DisputeRecord = {
       id: String(Date.now()),
       caseType: input.caseType,
       title: input.title,
-      stage: "RESPONSE_PENDING" as const,
-      claimant: actor ?? "0xClaimant",
+      stage: "RESPONSE_PENDING",
+      claimant,
       respondent: input.respondent,
       claimantStatement: input.claimantStatement,
       respondentStatement: "",
@@ -103,6 +116,14 @@ export async function createDispute(input: NewDisputeInput, actor?: string): Pro
       draftResolution: "",
       mediationPositions: {},
       finalTerms: "",
+      roles: {
+        claimant: [claimant],
+        respondent: [input.respondent],
+        counsel: [],
+        reviewer: [],
+        regulator: [],
+      },
+      appeals: [],
     };
     mockDisputes.unshift(created);
     saveMockDisputesToStorage();
@@ -116,11 +137,7 @@ export async function createDispute(input: NewDisputeInput, actor?: string): Pro
 
 export async function submitResponse(input: ResponseInput, actor?: string): Promise<string> {
   if (isMockMode) {
-    const dispute = mockDisputes.find((item) => item.id === input.caseId);
-    if (!dispute) {
-      throw new Error("Case not found.");
-    }
-
+    const dispute = requireMockCase(input.caseId);
     dispute.respondentStatement = input.respondentStatement;
     dispute.respondentEvidenceUrls = input.evidenceUrls
       .split(",")
@@ -138,11 +155,7 @@ export async function submitResponse(input: ResponseInput, actor?: string): Prom
 
 export async function analyzeCase(caseId: string, actor?: string): Promise<string> {
   if (isMockMode) {
-    const dispute = mockDisputes.find((item) => item.id === caseId);
-    if (!dispute) {
-      throw new Error("Case not found.");
-    }
-
+    const dispute = requireMockCase(caseId);
     dispute.stage = "MEDIATION_OPEN";
     dispute.issueMap =
       "1. Identify the operative agreement. 2. Determine whether key deliverables were accepted. 3. Compare remedy sought against remaining obligations.";
@@ -166,11 +179,7 @@ export async function analyzeCase(caseId: string, actor?: string): Promise<strin
 
 export async function recordMediation(input: MediationInput, actor?: string): Promise<string> {
   if (isMockMode) {
-    const dispute = mockDisputes.find((item) => item.id === input.caseId);
-    if (!dispute) {
-      throw new Error("Case not found.");
-    }
-
+    const dispute = requireMockCase(input.caseId);
     upsertMediationPosition(dispute, actor ?? "0xActor", input.option, input.rationale);
     saveMockDisputesToStorage();
     return `mock-mediation-${Date.now()}`;
@@ -181,13 +190,73 @@ export async function recordMediation(input: MediationInput, actor?: string): Pr
   return result.hash;
 }
 
-export async function publishFinalTerms(input: FinalTermsInput, actor?: string): Promise<string> {
+export async function assignRole(input: AssignRoleInput, actor?: string): Promise<string> {
   if (isMockMode) {
-    const dispute = mockDisputes.find((item) => item.id === input.caseId);
-    if (!dispute) {
-      throw new Error("Case not found.");
+    const dispute = requireMockCase(input.caseId);
+    if (!dispute.roles[input.role].includes(input.assignee)) {
+      dispute.roles[input.role].push(input.assignee);
+    }
+    saveMockDisputesToStorage();
+    return `mock-role-${Date.now()}-${actor ?? "operator"}`;
+  }
+
+  const result = await contractClient.assignRole(input, actor);
+  assertSuccessfulExecution(result.executionResultName);
+  return result.hash;
+}
+
+export async function submitAppeal(input: AppealInput, actor?: string): Promise<string> {
+  if (isMockMode) {
+    const dispute = requireMockCase(input.caseId);
+    dispute.appeals.unshift({
+      submittedBy: actor ?? "0xActor",
+      requestedAction: input.requestedAction,
+      rationale: input.rationale,
+      evidenceUrls: input.evidenceUrls
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      status: "PENDING_REVIEW",
+      reviewMemo: "",
+      reviewedBy: "",
+    });
+    saveMockDisputesToStorage();
+    return `mock-appeal-${Date.now()}`;
+  }
+
+  const result = await contractClient.submitAppeal(input, actor);
+  assertSuccessfulExecution(result.executionResultName);
+  return result.hash;
+}
+
+export async function reviewAppeal(input: AppealReviewInput, actor?: string): Promise<string> {
+  if (isMockMode) {
+    const dispute = requireMockCase(input.caseId);
+    const target = dispute.appeals[input.appealIndex];
+    if (!target) {
+      throw new Error("Appeal not found.");
     }
 
+    target.status = input.disposition;
+    target.reviewMemo = input.reviewMemo;
+    target.reviewedBy = actor ?? "0xReviewer";
+
+    if (input.disposition === "REOPENED") {
+      dispute.stage = "MEDIATION_OPEN";
+    }
+
+    saveMockDisputesToStorage();
+    return `mock-appeal-review-${Date.now()}`;
+  }
+
+  const result = await contractClient.reviewAppeal(input, actor);
+  assertSuccessfulExecution(result.executionResultName);
+  return result.hash;
+}
+
+export async function publishFinalTerms(input: FinalTermsInput, actor?: string): Promise<string> {
+  if (isMockMode) {
+    const dispute = requireMockCase(input.caseId);
     dispute.finalTerms = input.finalTerms;
     dispute.stage = "RESOLVED";
     saveMockDisputesToStorage();

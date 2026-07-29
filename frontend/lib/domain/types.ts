@@ -5,11 +5,25 @@ export type DisputeStage =
   | "RESOLVED";
 
 export type MediationOptionKey = "A" | "B" | "C" | "REJECT";
+export type RoleName = "claimant" | "respondent" | "counsel" | "reviewer" | "regulator";
+export type AppealStatus = "PENDING_REVIEW" | "UPHELD" | "REOPENED" | "MODIFIED_TERMS";
 
 export type MediationPosition = {
   option: MediationOptionKey;
   rationale: string;
 };
+
+export type AppealRecord = {
+  submittedBy: string;
+  requestedAction: string;
+  rationale: string;
+  evidenceUrls: string[];
+  status: AppealStatus;
+  reviewMemo: string;
+  reviewedBy: string;
+};
+
+export type CaseRoles = Record<RoleName, string[]>;
 
 export type DisputeRecord = {
   id: string;
@@ -28,6 +42,8 @@ export type DisputeRecord = {
   draftResolution: string;
   mediationPositions: Record<string, MediationPosition>;
   finalTerms: string;
+  roles: CaseRoles;
+  appeals: AppealRecord[];
 };
 
 export type NewDisputeInput = {
@@ -53,6 +69,26 @@ export type MediationInput = {
 export type FinalTermsInput = {
   caseId: string;
   finalTerms: string;
+};
+
+export type AssignRoleInput = {
+  caseId: string;
+  role: Exclude<RoleName, "claimant" | "respondent">;
+  assignee: string;
+};
+
+export type AppealInput = {
+  caseId: string;
+  requestedAction: string;
+  rationale: string;
+  evidenceUrls: string;
+};
+
+export type AppealReviewInput = {
+  caseId: string;
+  appealIndex: number;
+  disposition: Exclude<AppealStatus, "PENDING_REVIEW">;
+  reviewMemo: string;
 };
 
 export type PlatformConfig = {

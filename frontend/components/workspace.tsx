@@ -4,6 +4,9 @@ import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { appConfig } from "../lib/genlayer/config";
 import { getBrowserProvider } from "../lib/genlayer/wallet";
 import type {
+  AppealReviewInput,
+  AppealInput,
+  AssignRoleInput,
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
@@ -14,11 +17,14 @@ import type {
 } from "../lib/domain/types";
 import {
   analyzeCase,
+  assignRole,
   createDispute,
   getPlatformConfig,
   listDisputes,
   publishFinalTerms,
   recordMediation,
+  reviewAppeal,
+  submitAppeal,
   submitResponse,
 } from "../lib/services/dispute-service";
 import { CaseDetail } from "./case-detail";
@@ -47,6 +53,8 @@ export function Workspace() {
   const [isPending, startTransition] = useTransition();
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
+  const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
+  const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
 
   async function loadData() {
     const [loadedDisputes, loadedPlatformConfig] = await Promise.all([
@@ -178,63 +186,101 @@ export function Workspace() {
     return runMutation("Publish final terms", () => publishFinalTerms(input, walletAddress));
   }
 
+  function assignSpecialist(input: AssignRoleInput) {
+    return runMutation(`Assign ${input.role}`, () => assignRole(input, walletAddress));
+  }
+
+  function fileAppeal(input: AppealInput) {
+    return runMutation("Submit appeal", () => submitAppeal(input, walletAddress));
+  }
+
+  function decideAppeal(input: AppealReviewInput) {
+    return runMutation("Review appeal", () => reviewAppeal(input, walletAddress));
+  }
+
   return (
-    <main className="shell">
-      <section className="hero">
-        <div className="eyebrow">{platformConfig.platformName}</div>
-        <h1>AI-assisted dispute casework on GenLayer, built for mediation before resolution.</h1>
-        <p>
-          This project treats disputes like operational legal files: intake, response, issue
-          mapping, settlement paths, and a final resolution memo. It can run in mock mode for UI
-          development or against {appConfig.networkName} through the GenLayer Studio RPC.
-        </p>
-      </section>
-
-      <section className="panel" style={{ marginBottom: 20 }}>
-        <div className="meta">
-          <span className="badge">Hackathon pitch</span>
-          <span>Public-facing product summary</span>
+    <main className="shell shell-wide">
+      <section className="hero hero-paynest">
+        <div className="hero-copy">
+          <span className="eyebrow">AccordMesh on GenLayer</span>
+          <h1>Casework for the internet economy, from evidence intake to regulatory handoff.</h1>
+          <p>
+            AccordMesh is a mediation-first dispute console for platforms, creators, vendors, and
+            operators. It structures evidence, runs neutral analysis, tracks specialist roles, and
+            produces post-resolution packets for outside oversight.
+          </p>
+          <div className="actions-row">
+            <a className="button" href="#intake">
+              Start a new file
+            </a>
+            <a className="button secondary" href="#detail">
+              Inspect live casework
+            </a>
+          </div>
         </div>
-        <h2>Why AccordMesh stands out</h2>
-        <div className="list">
-          <div className="stage-card">
-            <strong>Mediation-first AI workflow</strong>
-            <p>
-              The product does not jump straight to a verdict. It structures the record, surfaces
-              issues, and gives parties realistic settlement paths before closing the file.
-            </p>
+        <div className="hero-stats">
+          <div className="hero-card accent">
+            <span>Network</span>
+            <strong>{appConfig.networkName}</strong>
+            <p>{appConfig.mode === "live" ? "Bound to the deployed Studionet contract." : "Local mock workflow."}</p>
           </div>
-          <div className="stage-card">
-            <strong>Built for real operational disputes</strong>
-            <p>
-              Policy packs support freelance, marketplace, lending, and B2B service conflicts with
-              tailored intake prompts and evidence checklists.
-            </p>
+          <div className="hero-card">
+            <span>Resolved matters</span>
+            <strong>{resolvedCount}</strong>
+            <p>Cases already eligible for regulator-ready packet export.</p>
           </div>
-          <div className="stage-card">
-            <strong>Ready for downstream oversight</strong>
-            <p>
-              After resolution, the tool generates a structured regulatory packet that can be
-              forwarded to a trust team, ombuds office, or regulator.
-            </p>
+          <div className="hero-card">
+            <span>Appeal queue</span>
+            <strong>{appealCount}</strong>
+            <p>Tracked oversight or reconsideration requests across the board.</p>
           </div>
         </div>
       </section>
 
-      <section className="panel" style={{ marginBottom: 20 }}>
-        <div className="kpis">
-          <div className="kpi">
-            <strong>{disputes.length}</strong>
-            <span>Cases loaded</span>
+      <section className="grid grid-top">
+        <section className="panel panel-heavy">
+          <div className="section-top">
+            <div>
+              <span className="eyebrow dark">Hackathon pitch</span>
+              <h2>Why this product feels different</h2>
+            </div>
+            <p>
+              Inspired by polished startup storytelling, but aimed at legal operations rather than
+              generic AI dashboards.
+            </p>
           </div>
-          <div className="kpi">
-            <strong>{appConfig.mode}</strong>
-            <span>App mode</span>
+          <div className="pitch-grid">
+            <div className="pitch-card">
+              <span className="mini-kicker">1</span>
+              <h3>Mediation-first intelligence</h3>
+              <p>It doesn&apos;t jump to a verdict. It organizes the file, spots issues, and opens realistic settlement lanes first.</p>
+            </div>
+            <div className="pitch-card">
+              <span className="mini-kicker">2</span>
+              <h3>Operational legal tooling</h3>
+              <p>Specialist roles, appeal review, evidence vaults, and regulatory packets make it feel usable beyond a demo flow.</p>
+            </div>
+            <div className="pitch-card">
+              <span className="mini-kicker">3</span>
+              <h3>Live on GenLayer</h3>
+              <p>Reads and writes are wired to Studionet, so the product can move from mock iteration into on-chain workflows.</p>
+            </div>
           </div>
-          <div className="kpi">
-            <strong>{platformConfig.operator || "Unbound"}</strong>
-            <span>Contract operator</span>
-          </div>
+        </section>
+      </section>
+
+      <section className="metric-band">
+        <div className="metric-card">
+          <span>Files loaded</span>
+          <strong>{disputes.length}</strong>
+        </div>
+        <div className="metric-card">
+          <span>Mode</span>
+          <strong>{appConfig.mode}</strong>
+        </div>
+        <div className="metric-card">
+          <span>Operator</span>
+          <strong>{platformConfig.operator || "Unbound"}</strong>
         </div>
       </section>
 
@@ -247,8 +293,8 @@ export function Workspace() {
 
       <TransactionStatusPanel transaction={transaction} />
 
-      <section className="grid">
-        <div className="stack">
+      <section className="grid app-grid">
+        <div className="stack left-rail">
           <WalletPanel
             address={walletAddress}
             chainId={chainId}
@@ -265,14 +311,16 @@ export function Workspace() {
               });
             }}
           />
-          <DisputeWizard disabled={isPending} onCreate={createCase} />
+          <div id="intake">
+            <DisputeWizard disabled={isPending} onCreate={createCase} />
+          </div>
           <CaseList
             disputes={disputes}
             selectedCaseId={selectedDispute?.id ?? ""}
             onSelect={setSelectedCaseId}
           />
         </div>
-        <div className="stack">
+        <div className="stack" id="detail">
           <CaseDetail
             dispute={selectedDispute}
             operator={platformConfig.operator}
@@ -282,31 +330,10 @@ export function Workspace() {
             onAnalyze={analyzeSelectedCase}
             onMediation={saveMediation}
             onFinalize={finalizeCase}
+            onAssignRole={assignSpecialist}
+            onSubmitAppeal={fileAppeal}
+            onReviewAppeal={decideAppeal}
           />
-          <section className="panel">
-            <div className="meta">
-              <span className="badge">Operational model</span>
-              <span>AccordMesh workflow</span>
-            </div>
-            <h2>What makes this product distinct</h2>
-            <div className="list">
-              <div className="stage-card">
-                It is built around phased casework, not a single verdict or prediction market.
-              </div>
-              <div className="stage-card">
-                AI generates issue maps, credibility notes, and settlement options that resemble
-                practical legal operations.
-              </div>
-              <div className="stage-card">
-                The same UI works in mock mode today and can switch to live GenLayer interactions
-                by setting the contract address and connecting a wallet.
-              </div>
-              <div className="stage-card">
-                Resolved matters can be converted into a regulator-ready dossier instead of ending
-                as a dead-end app verdict.
-              </div>
-            </div>
-          </section>
         </div>
       </section>
     </main>

@@ -5,7 +5,7 @@ AccordMesh is a GenLayer-native dispute casework platform focused on intake, evi
 Live deployment:
 
 - Frontend: https://accordmesh.vercel.app
-- Studionet contract: `0xe21441B7F4e9Caeb1959313551f30FB0a528E1Ba`
+- Studionet contract: `0x5187c794213c17Ab3E3e4Aa1EB9E7d9DD19BEC2b`
 
 This repo is intentionally designed to be structurally and conceptually different from verdict-and-betting dispute apps. The MVP centers on phased casework:
 
@@ -77,6 +77,10 @@ This repo now includes:
 - mock mode for UI iteration before deployment
 - live mode for Studionet once a contract address is configured
 - a regulatory submission packet export for post-resolution reporting
+- evidence upload routes for IPFS via Pinata and Google Drive via service account
+- role assignment for counsel, reviewer, and regulator
+- appeal filing and appeal review workflows
+- PDF-ready decision memo output
 
 ## GenLayer network notes
 

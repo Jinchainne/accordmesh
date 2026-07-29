@@ -29,6 +29,16 @@ class AccordMesh(gl.Contract):
         items = [item.strip() for item in raw_value.split(",")]
         return [item for item in items if item != ""]
 
+    def _has_access(self, case_doc: dict, sender_hex: str) -> bool:
+        if sender_hex == case_doc["claimant"] or sender_hex == case_doc["respondent"]:
+            return True
+
+        for role_name in ["counsel", "reviewer", "regulator"]:
+            if sender_hex in case_doc["roles"][role_name]:
+                return True
+
+        return False
+
     @gl.public.view
     def get_platform_config(self) -> dict[str, str]:
         return {
@@ -49,27 +59,6 @@ class AccordMesh(gl.Contract):
     def get_case_document(self, case_id: u256) -> str:
         return self.cases[case_id]
 
-    @gl.public.view
-    def get_case(self, case_id: u256) -> dict[str, str]:
-        case_doc = self._require_case(case_id)
-        return {
-            "id": str(case_doc["id"]),
-            "stage": case_doc["stage"],
-            "case_type": case_doc["case_type"],
-            "title": case_doc["title"],
-            "claimant": case_doc["claimant"],
-            "respondent": case_doc["respondent"],
-            "claimant_statement": case_doc["claimant_statement"],
-            "respondent_statement": case_doc["respondent_statement"],
-            "issue_map": case_doc["issue_map"],
-            "credibility_notes": case_doc["credibility_notes"],
-            "settlement_option_a": case_doc["settlement_option_a"],
-            "settlement_option_b": case_doc["settlement_option_b"],
-            "settlement_option_c": case_doc["settlement_option_c"],
-            "draft_resolution": case_doc["draft_resolution"],
-            "final_terms": case_doc["final_terms"],
-        }
-
     @gl.public.write
     def file_dispute(
         self,
@@ -86,13 +75,16 @@ class AccordMesh(gl.Contract):
         self.next_case_id += 1
         self.case_ids.append(case_id)
 
+        claimant_hex = gl.message.sender_address.as_hex
+        respondent_hex = Address(respondent_address).as_hex
+
         case_doc = {
             "id": int(case_id),
             "case_type": case_type.strip(),
             "title": title.strip(),
             "stage": "RESPONSE_PENDING",
-            "claimant": gl.message.sender_address.as_hex,
-            "respondent": Address(respondent_address).as_hex,
+            "claimant": claimant_hex,
+            "respondent": respondent_hex,
             "claimant_statement": claimant_statement.strip(),
             "respondent_statement": "",
             "claimant_evidence_urls": self._split_csv(evidence_urls_csv),
@@ -105,6 +97,14 @@ class AccordMesh(gl.Contract):
             "draft_resolution": "",
             "mediation_positions": {},
             "final_terms": "",
+            "roles": {
+                "claimant": [claimant_hex],
+                "respondent": [respondent_hex],
+                "counsel": [],
+                "reviewer": [],
+                "regulator": [],
+            },
+            "appeals": [],
         }
 
         self._save_case(case_id, case_doc)
@@ -202,6 +202,83 @@ Return JSON with exactly these keys:
             "option": option_key,
             "rationale": rationale[:1000],
         }
+        self._save_case(case_id, case_doc)
+
+    @gl.public.write
+    def assign_case_role(
+        self,
+        case_id: u256,
+        role_name: str,
+        assignee_address: str,
+    ) -> None:
+        assert role_name in ["counsel", "reviewer", "regulator"], "INVALID_ROLE"
+        assert gl.message.sender_address == self.operator, "ONLY_OPERATOR"
+
+        case_doc = self._require_case(case_id)
+        assignee_hex = Address(assignee_address).as_hex
+
+        if assignee_hex not in case_doc["roles"][role_name]:
+            case_doc["roles"][role_name].append(assignee_hex)
+
+        self._save_case(case_id, case_doc)
+
+    @gl.public.write
+    def submit_appeal(
+        self,
+        case_id: u256,
+        requested_action: str,
+        rationale: str,
+        evidence_urls_csv: str,
+    ) -> None:
+        case_doc = self._require_case(case_id)
+        assert case_doc["stage"] == "RESOLVED", "CASE_NOT_RESOLVED"
+        assert rationale.strip() != "", "RATIONALE_REQUIRED"
+        assert requested_action.strip() != "", "ACTION_REQUIRED"
+
+        sender = gl.message.sender_address.as_hex
+        assert self._has_access(case_doc, sender), "NO_CASE_ACCESS"
+
+        case_doc["appeals"].append(
+            {
+                "submitted_by": sender,
+                "requested_action": requested_action[:1000],
+                "rationale": rationale[:3000],
+                "evidence_urls": self._split_csv(evidence_urls_csv),
+                "status": "PENDING_REVIEW",
+                "review_memo": "",
+                "reviewed_by": "",
+            }
+        )
+        self._save_case(case_id, case_doc)
+
+    @gl.public.write
+    def review_appeal(
+        self,
+        case_id: u256,
+        appeal_index: u256,
+        disposition: str,
+        review_memo: str,
+    ) -> None:
+        assert disposition in ["UPHELD", "REOPENED", "MODIFIED_TERMS"], "INVALID_DISPOSITION"
+        case_doc = self._require_case(case_id)
+        sender = gl.message.sender_address.as_hex
+
+        assert (
+            gl.message.sender_address == self.operator
+            or sender in case_doc["roles"]["reviewer"]
+            or sender in case_doc["roles"]["regulator"]
+        ), "ONLY_REVIEWERS"
+
+        idx = int(appeal_index)
+        assert idx >= 0 and idx < len(case_doc["appeals"]), "INVALID_APPEAL_INDEX"
+
+        case_doc["appeals"][idx]["status"] = disposition
+        case_doc["appeals"][idx]["review_memo"] = review_memo[:3000]
+        case_doc["appeals"][idx]["reviewed_by"] = sender
+
+        if disposition == "REOPENED":
+            case_doc["stage"] = "MEDIATION_OPEN"
+
         self._save_case(case_id, case_doc)
 
     @gl.public.write
