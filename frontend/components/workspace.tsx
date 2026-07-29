@@ -340,6 +340,47 @@ export function Workspace() {
       return;
     }
 
+    if (provider?.isMetaMask) {
+      try {
+        setErrorMessage("");
+        setWalletMessage("Waiting for MetaMask account approval...");
+        await inspectWallet();
+
+        const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+        const nextAddress = accounts[0] ?? "";
+
+        if (!nextAddress) {
+          setWalletMessage("MetaMask approved, but no account was returned.");
+          setWalletDiagnostics((current) => [
+            ...current.filter((item) => item.label !== "Connect step"),
+            {
+              label: "Connect step",
+              value: "No account returned from MetaMask.",
+              tone: "danger",
+            },
+          ]);
+          return;
+        }
+
+        setWalletAddress(nextAddress);
+        await prepareConnectedWallet(nextAddress);
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "MetaMask connection failed.";
+        setErrorMessage(message);
+        setWalletMessage(message);
+        setWalletDiagnostics((current) => [
+          ...current.filter((item) => item.label !== "Connect step"),
+          {
+            label: "Connect step",
+            value: message,
+            tone: "danger",
+          },
+        ]);
+        return;
+      }
+    }
+
     if (!isConnected) {
       if (openConnectModal) {
         setWalletMessage("Choose a wallet in the connect modal.");
