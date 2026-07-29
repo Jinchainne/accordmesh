@@ -2,10 +2,10 @@
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
-import { useAccount, useDisconnect } from "wagmi";
+import { useAccount, useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { appConfig } from "../lib/genlayer/config";
-import { createWriteClient } from "../lib/genlayer/client";
 import { getBrowserProvider } from "../lib/genlayer/wallet";
+import { studionetChain } from "../lib/wallet/studionet-chain";
 import type {
   AppealReviewInput,
   AppealInput,
@@ -42,7 +42,9 @@ const idleTransaction: TransactionState = {
 
 export function Workspace() {
   const { address: connectedAddress, isConnected } = useAccount();
+  const connectedChainId = useChainId();
   const { disconnect } = useDisconnect();
+  const { switchChainAsync } = useSwitchChain();
   const { openConnectModal } = useConnectModal();
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
@@ -59,8 +61,8 @@ export function Workspace() {
   >([
     { label: "Provider", value: "Checking..." },
     { label: "MetaMask", value: "Checking..." },
-    { label: "Snaps API", value: "Checking..." },
-    { label: "GenLayer Snap", value: "Checking..." },
+    { label: "Chain", value: "Checking..." },
+    { label: "Studionet", value: "Checking..." },
   ]);
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
@@ -116,14 +118,20 @@ export function Workspace() {
     setWalletAddress(connectedAddress);
   }, [connectedAddress]);
 
+  useEffect(() => {
+    if (connectedChainId) {
+      setChainId(`0x${connectedChainId.toString(16)}`);
+    }
+  }, [connectedChainId]);
+
   const inspectWallet = useEffectEvent(async () => {
     const provider = getBrowserProvider();
     if (!provider) {
       setWalletDiagnostics([
         { label: "Provider", value: "Not found", tone: "danger" },
         { label: "MetaMask", value: "Unavailable", tone: "danger" },
-        { label: "Snaps API", value: "Unavailable", tone: "danger" },
-        { label: "GenLayer Snap", value: "Unknown", tone: "warn" },
+        { label: "Chain", value: "Unavailable", tone: "danger" },
+        { label: "Studionet", value: "Unknown", tone: "warn" },
       ]);
       return;
     }
@@ -139,8 +147,8 @@ export function Workspace() {
         value: provider.isMetaMask ? (provider.isRabby ? "Spoofed by Rabby" : "Yes") : "No",
         tone: provider.isMetaMask ? (provider.isRabby ? "warn" : "ok") : "warn",
       },
-      { label: "Snaps API", value: "Checking..." },
-      { label: "GenLayer Snap", value: "Checking..." },
+      { label: "Chain", value: "Checking..." },
+      { label: "Studionet", value: "Checking..." },
     ];
 
     try {
@@ -154,8 +162,8 @@ export function Workspace() {
       if (clientVersion?.toLowerCase().includes("rabby") || provider.isRabby) {
         nextDiagnostics.push({
           label: "Compatibility",
-          value: "Rabby does not support GenLayer Snap. Use desktop MetaMask.",
-          tone: "danger",
+          value: "Rabby can inject as MetaMask. MetaMask is recommended for the cleanest Studionet flow.",
+          tone: "warn",
         });
       }
     } catch {
@@ -167,38 +175,26 @@ export function Workspace() {
     }
 
     try {
-      const snaps = (await provider.request({ method: "wallet_getSnaps" })) as Record<
-        string,
-        { id?: string; version?: string }
-      >;
-      const snapEntries = Object.values(snaps ?? {});
-      const genlayerSnap = snapEntries.find((snap) => snap.id?.includes("genlayer"));
-
+      const currentChainId = (await provider.request({ method: "eth_chainId" })) as string;
       nextDiagnostics[2] = {
-        label: "Snaps API",
-        value: "Available",
+        label: "Chain",
+        value: currentChainId || "Unknown",
         tone: "ok",
       };
-      nextDiagnostics[3] = genlayerSnap
-        ? {
-            label: "GenLayer Snap",
-            value: `${genlayerSnap.id}${genlayerSnap.version ? ` @ ${genlayerSnap.version}` : ""}`,
-            tone: "ok",
-          }
-        : {
-            label: "GenLayer Snap",
-            value: "Not installed",
-            tone: "warn",
-          };
+      nextDiagnostics[3] = {
+        label: "Studionet",
+        value: currentChainId === "0xf22f" ? "Ready" : "Needs switch",
+        tone: currentChainId === "0xf22f" ? "ok" : "warn",
+      };
     } catch (error) {
       nextDiagnostics[2] = {
-        label: "Snaps API",
+        label: "Chain",
         value: "Not available",
         tone: "danger",
       };
       nextDiagnostics[3] = {
-        label: "GenLayer Snap",
-        value: error instanceof Error ? error.message : "Could not inspect snaps",
+        label: "Studionet",
+        value: error instanceof Error ? error.message : "Could not inspect chain state",
         tone: "warn",
       };
     }
@@ -214,12 +210,10 @@ export function Workspace() {
       return;
     }
 
-    const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
     const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
-    setWalletAddress(accounts[0] ?? "");
-    setChainId(nextChainId ?? "");
+    setChainId((current) => current || nextChainId || "");
     setWalletMessage(
-      accounts[0]
+      connectedAddress
         ? "Wallet connected and ready to sign GenLayer transactions."
         : "Wallet detected. Connect MetaMask to sign transactions.",
     );
@@ -263,73 +257,26 @@ export function Workspace() {
     try {
       setErrorMessage("");
       await inspectWallet();
-      const nextChainId = (await provider.request({ method: "eth_chainId" })) as string;
-      setChainId(nextChainId ?? "");
-      setWalletMessage("Wallet connected. Preparing GenLayer Studionet access...");
+      setWalletMessage("Wallet connected. Preparing Studionet network...");
 
-      try {
-        const writeClient = createWriteClient(address as `0x${string}`, provider);
-        await writeClient.connect(appConfig.networkName as never);
-        const updatedChainId = (await provider.request({ method: "eth_chainId" })) as string;
-        setChainId(updatedChainId ?? nextChainId ?? "");
-        setWalletMessage(
-          `Connected as ${address}. Studionet access is ready${
-            updatedChainId ? ` on chain ${updatedChainId}` : ""
-          }.`,
-        );
-        await inspectWallet();
-        setLastPreparedAddress(address);
-      } catch (networkError) {
-        const message =
-          networkError instanceof Error
-            ? networkError.message
-            : "Wallet connected, but GenLayer network setup failed.";
-        setWalletMessage(
-          `${message} Use desktop MetaMask with Snaps enabled to complete Studionet setup.`,
-        );
-        setWalletDiagnostics((current) => [
-          ...current.filter((item) => item.label !== "Connect step"),
-          {
-            label: "Connect step",
-            value: message,
-            tone: "danger",
-          },
-        ]);
+      if (connectedChainId !== studionetChain.id) {
+        await switchChainAsync({
+          chainId: studionetChain.id,
+        });
       }
+
+      const updatedChainId = (await provider.request({ method: "eth_chainId" })) as string;
+      setChainId(updatedChainId ?? "");
+      setWalletMessage(
+        `Connected as ${address}. Studionet access is ready${
+          updatedChainId ? ` on chain ${updatedChainId}` : ""
+        }.`,
+      );
+      await inspectWallet();
+      setLastPreparedAddress(address);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet connection failed.";
       setErrorMessage(message);
-      setWalletMessage(message);
-      setWalletDiagnostics((current) => [
-        ...current.filter((item) => item.label !== "Connect step"),
-        {
-          label: "Connect step",
-          value: message,
-          tone: "danger",
-        },
-      ]);
-    }
-  });
-
-  const installGenLayerSnap = useEffectEvent(async () => {
-    const provider = getBrowserProvider();
-    if (!provider) {
-      setWalletMessage("MetaMask was not found in this browser.");
-      return;
-    }
-
-    try {
-      setWalletMessage("Requesting GenLayer Snap installation...");
-      await provider.request({
-        method: "wallet_requestSnaps",
-        params: {
-          "npm:genlayer-wallet-plugin": {},
-        },
-      });
-      setWalletMessage("GenLayer Snap installed. Click Connect wallet again to prepare Studionet.");
-      await inspectWallet();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "GenLayer Snap installation failed.";
       setWalletMessage(message);
       setWalletDiagnostics((current) => [
         ...current.filter((item) => item.label !== "Connect step"),
@@ -353,67 +300,7 @@ export function Workspace() {
   }, [connectedAddress, isConnected, lastPreparedAddress, prepareConnectedWallet]);
 
   async function connectWallet() {
-    const provider = getBrowserProvider();
-    if (provider?.isRabby) {
-      setWalletMessage("Rabby is detected, but GenLayer Studionet setup requires desktop MetaMask with Snaps.");
-      setWalletDiagnostics((current) => [
-        ...current.filter((item) => item.label !== "Compatibility" && item.label !== "Connect step"),
-        {
-          label: "Compatibility",
-          value: "Rabby does not support GenLayer Snap. Switch to MetaMask.",
-          tone: "danger",
-        },
-        {
-          label: "Connect step",
-          value: "Blocked because the active injected wallet is Rabby.",
-          tone: "danger",
-        },
-      ]);
-      return;
-    }
-
-    if (provider?.isMetaMask) {
-      try {
-        setErrorMessage("");
-        setWalletMessage("Waiting for MetaMask account approval...");
-        await inspectWallet();
-
-        const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-        const nextAddress = accounts[0] ?? "";
-
-        if (!nextAddress) {
-          setWalletMessage("MetaMask approved, but no account was returned.");
-          setWalletDiagnostics((current) => [
-            ...current.filter((item) => item.label !== "Connect step"),
-            {
-              label: "Connect step",
-              value: "No account returned from MetaMask.",
-              tone: "danger",
-            },
-          ]);
-          return;
-        }
-
-        setWalletAddress(nextAddress);
-        await prepareConnectedWallet(nextAddress);
-        return;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "MetaMask connection failed.";
-        setErrorMessage(message);
-        setWalletMessage(message);
-        setWalletDiagnostics((current) => [
-          ...current.filter((item) => item.label !== "Connect step"),
-          {
-            label: "Connect step",
-            value: message,
-            tone: "danger",
-          },
-        ]);
-        return;
-      }
-    }
-
-    if (!isConnected) {
+    if (!connectedAddress) {
       if (openConnectModal) {
         setWalletMessage("Choose a wallet in the connect modal.");
         openConnectModal();
@@ -424,12 +311,7 @@ export function Workspace() {
       return;
     }
 
-    if (connectedAddress) {
-      await prepareConnectedWallet(connectedAddress);
-      return;
-    }
-
-    disconnect();
+    await prepareConnectedWallet(connectedAddress);
   }
 
   async function runMutation(label: string, task: () => Promise<string>) {
@@ -556,18 +438,9 @@ export function Workspace() {
             rpcUrl={appConfig.rpcUrl}
             message={walletMessage}
             canConnect={Boolean(openConnectModal) || Boolean(getBrowserProvider())}
-            connectLabel={hasConnectedWallet ? "Prepare Studionet" : "Connect wallet"}
-            showSnapAction={walletDiagnostics.some(
-              (item) => item.label === "GenLayer Snap" && item.value === "Not installed",
-            )}
-            snapActionLabel="Install GenLayer Snap"
+            connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
             diagnostics={walletDiagnostics}
             onConnect={connectWallet}
-            onInstallSnap={() => {
-              startTransition(async () => {
-                await installGenLayerSnap();
-              });
-            }}
             onRefresh={() => {
               startTransition(async () => {
                 await refreshData();
