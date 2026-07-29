@@ -50,8 +50,8 @@ export function DisputeWizard({ disabled, onCreate }: DisputeWizardProps) {
           <h2>File a dispute with a lawyer-style intake pack</h2>
         </div>
         <p>
-          Capture the facts, counterparties, and evidence trail in a format that can move from
-          intake to mediation, appeal, and regulatory review.
+          Build a file that already feels litigation-ready: counterparties, facts, exhibits,
+          and remedy theory in one intake motion.
         </p>
       </div>
 

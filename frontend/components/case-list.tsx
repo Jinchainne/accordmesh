@@ -37,6 +37,7 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
               <div className="readiness-pill">{getCaseReadiness(dispute)}%</div>
             </div>
             <p>{dispute.claimantStatement}</p>
+            <div className="case-rail" />
             <div className="meta">
               <span>{dispute.claimantEvidenceUrls.length} claimant exhibits</span>
               <span>{dispute.respondentEvidenceUrls.length} respondent exhibits</span>

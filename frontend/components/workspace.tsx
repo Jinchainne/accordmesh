@@ -203,73 +203,59 @@ export function Workspace() {
       <section className="hero hero-paynest">
         <div className="hero-copy">
           <span className="eyebrow">AccordMesh on GenLayer</span>
-          <h1>Casework for the internet economy, from evidence intake to regulatory handoff.</h1>
+          <h1>Dispute operations for teams that need more than a chatbot verdict.</h1>
           <p>
-            AccordMesh is a mediation-first dispute console for platforms, creators, vendors, and
-            operators. It structures evidence, runs neutral analysis, tracks specialist roles, and
-            produces post-resolution packets for outside oversight.
+            A mediation-first console for platforms, operators, and marketplaces. Organize
+            evidence, route specialist roles, review appeals, and generate regulator-ready case
+            packets from one live workflow on GenLayer.
           </p>
-          <div className="actions-row">
+          <div className="actions-row hero-actions">
             <a className="button" href="#intake">
-              Start a new file
+              Open a file
             </a>
             <a className="button secondary" href="#detail">
-              Inspect live casework
+              Review live workflow
             </a>
+          </div>
+          <div className="signal-strip">
+            <div>
+              <span>Workflow</span>
+              <strong>Intake to Appeal</strong>
+            </div>
+            <div>
+              <span>Storage</span>
+              <strong>IPFS + Drive</strong>
+            </div>
+            <div>
+              <span>Output</span>
+              <strong>PDF-ready memos</strong>
+            </div>
           </div>
         </div>
         <div className="hero-stats">
           <div className="hero-card accent">
-            <span>Network</span>
+            <span>Live network</span>
             <strong>{appConfig.networkName}</strong>
-            <p>{appConfig.mode === "live" ? "Bound to the deployed Studionet contract." : "Local mock workflow."}</p>
+            <p>
+              {appConfig.mode === "live"
+                ? "Bound to the deployed Studionet contract."
+                : "Local mock workflow."}
+            </p>
           </div>
           <div className="hero-card">
             <span>Resolved matters</span>
             <strong>{resolvedCount}</strong>
-            <p>Cases already eligible for regulator-ready packet export.</p>
+            <p>Files that can already be exported into an oversight-ready packet.</p>
           </div>
           <div className="hero-card">
             <span>Appeal queue</span>
             <strong>{appealCount}</strong>
-            <p>Tracked oversight or reconsideration requests across the board.</p>
+            <p>Reconsideration and regulator review requests tracked in the same workspace.</p>
           </div>
         </div>
       </section>
 
-      <section className="grid grid-top">
-        <section className="panel panel-heavy">
-          <div className="section-top">
-            <div>
-              <span className="eyebrow dark">Hackathon pitch</span>
-              <h2>Why this product feels different</h2>
-            </div>
-            <p>
-              Inspired by polished startup storytelling, but aimed at legal operations rather than
-              generic AI dashboards.
-            </p>
-          </div>
-          <div className="pitch-grid">
-            <div className="pitch-card">
-              <span className="mini-kicker">1</span>
-              <h3>Mediation-first intelligence</h3>
-              <p>It doesn&apos;t jump to a verdict. It organizes the file, spots issues, and opens realistic settlement lanes first.</p>
-            </div>
-            <div className="pitch-card">
-              <span className="mini-kicker">2</span>
-              <h3>Operational legal tooling</h3>
-              <p>Specialist roles, appeal review, evidence vaults, and regulatory packets make it feel usable beyond a demo flow.</p>
-            </div>
-            <div className="pitch-card">
-              <span className="mini-kicker">3</span>
-              <h3>Live on GenLayer</h3>
-              <p>Reads and writes are wired to Studionet, so the product can move from mock iteration into on-chain workflows.</p>
-            </div>
-          </div>
-        </section>
-      </section>
-
-      <section className="metric-band">
+      <section className="metric-band compact-band">
         <div className="metric-card">
           <span>Files loaded</span>
           <strong>{disputes.length}</strong>
@@ -321,6 +307,25 @@ export function Workspace() {
           />
         </div>
         <div className="stack" id="detail">
+          <section className="panel vision-panel">
+            <div className="vision-grid">
+              <div>
+                <span className="eyebrow dark">Why it feels real</span>
+                <h2>Designed like an operations console, not an AI landing page.</h2>
+              </div>
+              <div className="vision-list">
+                <div className="vision-item">
+                  Mediation first, then final terms, then a regulator-ready packet.
+                </div>
+                <div className="vision-item">
+                  Counsel, reviewers, and regulators sit inside the same case record.
+                </div>
+                <div className="vision-item">
+                  Appeals become part of the procedural timeline instead of a dead-end chat reset.
+                </div>
+              </div>
+            </div>
+          </section>
           <CaseDetail
             dispute={selectedDispute}
             operator={platformConfig.operator}
