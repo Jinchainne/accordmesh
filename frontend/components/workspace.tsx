@@ -68,6 +68,7 @@ export function Workspace() {
   const [lastPreparedAddress, setLastPreparedAddress] = useState("");
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
+  const hasConnectedWallet = walletAddress !== "";
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
   const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
   const intakeCount = disputes.filter((item) => item.stage === "RESPONSE_PENDING").length;
@@ -310,6 +311,37 @@ export function Workspace() {
     }
   });
 
+  const installGenLayerSnap = useEffectEvent(async () => {
+    const provider = getBrowserProvider();
+    if (!provider) {
+      setWalletMessage("MetaMask was not found in this browser.");
+      return;
+    }
+
+    try {
+      setWalletMessage("Requesting GenLayer Snap installation...");
+      await provider.request({
+        method: "wallet_requestSnaps",
+        params: {
+          "npm:genlayer-wallet-plugin": {},
+        },
+      });
+      setWalletMessage("GenLayer Snap installed. Click Connect wallet again to prepare Studionet.");
+      await inspectWallet();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "GenLayer Snap installation failed.";
+      setWalletMessage(message);
+      setWalletDiagnostics((current) => [
+        ...current.filter((item) => item.label !== "Connect step"),
+        {
+          label: "Connect step",
+          value: message,
+          tone: "danger",
+        },
+      ]);
+    }
+  });
+
   useEffect(() => {
     if (!isConnected || !connectedAddress || lastPreparedAddress === connectedAddress) {
       return;
@@ -517,16 +549,25 @@ export function Workspace() {
             address={walletAddress}
             chainId={chainId}
             hasWallet={Boolean(getBrowserProvider())}
-            isConnected={isConnected && walletAddress !== ""}
+            isConnected={hasConnectedWallet}
             isBusy={isPending}
             mode={appConfig.mode}
             networkName={appConfig.networkName}
             rpcUrl={appConfig.rpcUrl}
             message={walletMessage}
             canConnect={Boolean(openConnectModal) || Boolean(getBrowserProvider())}
-            connectLabel={isConnected ? "Prepare Studionet" : "Connect wallet"}
+            connectLabel={hasConnectedWallet ? "Prepare Studionet" : "Connect wallet"}
+            showSnapAction={walletDiagnostics.some(
+              (item) => item.label === "GenLayer Snap" && item.value === "Not installed",
+            )}
+            snapActionLabel="Install GenLayer Snap"
             diagnostics={walletDiagnostics}
             onConnect={connectWallet}
+            onInstallSnap={() => {
+              startTransition(async () => {
+                await installGenLayerSnap();
+              });
+            }}
             onRefresh={() => {
               startTransition(async () => {
                 await refreshData();
