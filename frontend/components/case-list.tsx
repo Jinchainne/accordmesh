@@ -14,10 +14,10 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
     <section className="panel">
       <div className="section-top compact">
         <div>
-          <span className="eyebrow dark">Case Board</span>
+          <span className="eyebrow dark">Case board</span>
           <h2>Active files</h2>
         </div>
-        <p>{disputes.length} records loaded across intake, mediation, and post-resolution review.</p>
+        <p>{disputes.length} records across intake, mediation, appeal, and regulator review.</p>
       </div>
       <div className="list">
         {disputes.map((dispute) => (

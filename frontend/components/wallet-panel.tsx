@@ -27,26 +27,37 @@ export function WalletPanel({
 }: WalletPanelProps) {
   return (
     <section className="panel">
-      <div className="meta">
-        <span className="badge">Wallet</span>
-        <span>{mode === "mock" ? "Mock workflow" : "Live Studionet workflow"}</span>
+      <div className="section-top compact">
+        <div>
+          <span className="eyebrow dark">Network access</span>
+          <h2>Wallet and chain</h2>
+        </div>
       </div>
-      <h2>Connection workspace</h2>
       <div className="list">
-        <div className="stage-card">
-          <strong>Network</strong>
-          <p>
-            {networkName} via <span className="mono">{rpcUrl}</span>
-          </p>
+        <div className="status-row">
+          <span>Status</span>
+          <strong>{isConnected ? "Connected" : "Not connected"}</strong>
         </div>
-        <div className="stage-card">
-          <strong>Wallet status</strong>
-          <p>{hasWallet ? "Browser wallet detected." : "No browser wallet detected."}</p>
-          <p>{isConnected ? `Connected as ${address}` : "Connect MetaMask to sign transactions."}</p>
+        <div className="status-row">
+          <span>Wallet</span>
+          <strong>{hasWallet ? "Detected" : "Missing"}</strong>
+        </div>
+        <div className="status-row">
+          <span>Environment</span>
+          <strong>{mode === "mock" ? "Mock workflow" : "Live Studionet workflow"}</strong>
+        </div>
+        <div className="stage-card compact-card">
+          <strong>RPC endpoint</strong>
+          <p className="mono">{rpcUrl}</p>
+        </div>
+        <div className="stage-card compact-card">
+          <strong>Connected signer</strong>
+          <p className="mono">{isConnected ? address : "Connect MetaMask to sign transactions."}</p>
           {chainId ? <p>Current chain id: {chainId}</p> : null}
+          <p>Network: {networkName}</p>
         </div>
       </div>
-      <div className="actions-row">
+      <div className="actions-row tight-actions">
         <button className="button" type="button" onClick={onConnect} disabled={isBusy || !hasWallet}>
           {isConnected ? "Reconnect wallet" : "Connect wallet"}
         </button>
@@ -57,4 +68,3 @@ export function WalletPanel({
     </section>
   );
 }
-

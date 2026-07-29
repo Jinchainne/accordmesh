@@ -55,6 +55,10 @@ export function Workspace() {
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
   const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
+  const intakeCount = disputes.filter((item) => item.stage === "RESPONSE_PENDING").length;
+  const reviewCount = disputes.filter(
+    (item) => item.stage === "ANALYSIS_READY" || item.stage === "MEDIATION_OPEN",
+  ).length;
 
   async function loadData() {
     const [loadedDisputes, loadedPlatformConfig] = await Promise.all([
@@ -199,76 +203,29 @@ export function Workspace() {
   }
 
   return (
-    <main className="shell shell-wide">
-      <section className="hero hero-paynest">
-        <div className="hero-copy">
-          <span className="eyebrow">AccordMesh on GenLayer</span>
-          <h1>Dispute operations for teams that need more than a chatbot verdict.</h1>
-          <p>
-            A mediation-first console for platforms, operators, and marketplaces. Organize
-            evidence, route specialist roles, review appeals, and generate regulator-ready case
-            packets from one live workflow on GenLayer.
-          </p>
-          <div className="actions-row hero-actions">
-            <a className="button" href="#intake">
-              Open a file
-            </a>
-            <a className="button secondary" href="#detail">
-              Review live workflow
-            </a>
-          </div>
-          <div className="signal-strip">
-            <div>
-              <span>Workflow</span>
-              <strong>Intake to Appeal</strong>
-            </div>
-            <div>
-              <span>Storage</span>
-              <strong>IPFS + Drive</strong>
-            </div>
-            <div>
-              <span>Output</span>
-              <strong>PDF-ready memos</strong>
-            </div>
+    <main className="shell shell-app">
+      <header className="app-header">
+        <div className="brand-block">
+          <div className="brand-mark">A</div>
+          <div>
+            <span className="eyebrow solid">AccordMesh</span>
+            <h1>Dispute operations workspace</h1>
           </div>
         </div>
-        <div className="hero-stats">
-          <div className="hero-card accent">
-            <span>Live network</span>
+        <div className="header-actions">
+          <div className="header-chip">
+            <span>Network</span>
             <strong>{appConfig.networkName}</strong>
-            <p>
-              {appConfig.mode === "live"
-                ? "Bound to the deployed Studionet contract."
-                : "Local mock workflow."}
-            </p>
           </div>
-          <div className="hero-card">
-            <span>Resolved matters</span>
-            <strong>{resolvedCount}</strong>
-            <p>Files that can already be exported into an oversight-ready packet.</p>
+          <div className="header-chip">
+            <span>Mode</span>
+            <strong>{appConfig.mode}</strong>
           </div>
-          <div className="hero-card">
-            <span>Appeal queue</span>
-            <strong>{appealCount}</strong>
-            <p>Reconsideration and regulator review requests tracked in the same workspace.</p>
-          </div>
+          <a className="button" href="#intake">
+            New file
+          </a>
         </div>
-      </section>
-
-      <section className="metric-band compact-band">
-        <div className="metric-card">
-          <span>Files loaded</span>
-          <strong>{disputes.length}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Mode</span>
-          <strong>{appConfig.mode}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Operator</span>
-          <strong>{platformConfig.operator || "Unbound"}</strong>
-        </div>
-      </section>
+      </header>
 
       {errorMessage ? (
         <section className="panel error-panel">
@@ -279,8 +236,28 @@ export function Workspace() {
 
       <TransactionStatusPanel transaction={transaction} />
 
-      <section className="grid app-grid">
-        <div className="stack left-rail">
+      <section className="workspace-layout">
+        <aside className="sidebar">
+          <section className="panel sidebar-intro">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Operations</span>
+                <h2>Run intake, review, appeals, and handoff from one board.</h2>
+              </div>
+            </div>
+            <p>
+              A casework console for marketplaces and operators that need evidence handling,
+              specialist routing, and regulator-ready outputs.
+            </p>
+          </section>
+
+          <nav className="panel section-nav">
+            <a href="#overview">Overview</a>
+            <a href="#board">Case board</a>
+            <a href="#intake">Open new file</a>
+            <a href="#detail">Case workspace</a>
+          </nav>
+
           <WalletPanel
             address={walletAddress}
             chainId={chainId}
@@ -297,48 +274,100 @@ export function Workspace() {
               });
             }}
           />
-          <div id="intake">
-            <DisputeWizard disabled={isPending} onCreate={createCase} />
-          </div>
+
           <CaseList
             disputes={disputes}
             selectedCaseId={selectedDispute?.id ?? ""}
             onSelect={setSelectedCaseId}
           />
-        </div>
-        <div className="stack" id="detail">
-          <section className="panel vision-panel">
-            <div className="vision-grid">
-              <div>
-                <span className="eyebrow dark">Why it feels real</span>
-                <h2>Designed like an operations console, not an AI landing page.</h2>
+        </aside>
+
+        <div className="content-stack">
+          <section className="overview-grid" id="overview">
+            <div className="panel summary-panel summary-panel-primary">
+              <div className="summary-copy">
+                <span className="eyebrow solid">Live workspace</span>
+                <h2>Teams get one operating surface instead of a static showcase page.</h2>
+                <p>
+                  Intake, neutral analysis, assigned counsel, reviewer oversight, appeals, and
+                  regulator export stay inside the same procedural record.
+                </p>
               </div>
-              <div className="vision-list">
-                <div className="vision-item">
-                  Mediation first, then final terms, then a regulator-ready packet.
-                </div>
-                <div className="vision-item">
-                  Counsel, reviewers, and regulators sit inside the same case record.
-                </div>
-                <div className="vision-item">
-                  Appeals become part of the procedural timeline instead of a dead-end chat reset.
-                </div>
+              <div className="summary-actions">
+                <a className="button" href="#detail">
+                  Open selected file
+                </a>
+                <a className="button secondary" href="#intake">
+                  Start intake
+                </a>
+              </div>
+            </div>
+
+            <div className="metric-cluster">
+              <div className="metric-card dense">
+                <span>Open files</span>
+                <strong>{disputes.length}</strong>
+                <p>All active records loaded from the current workspace state.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Resolution-ready</span>
+                <strong>{resolvedCount}</strong>
+                <p>Matters already suitable for export and oversight handoff.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Appeals</span>
+                <strong>{appealCount}</strong>
+                <p>Reconsideration requests and review actions tracked on board.</p>
               </div>
             </div>
           </section>
-          <CaseDetail
-            dispute={selectedDispute}
-            operator={platformConfig.operator}
-            connectedAddress={walletAddress}
-            busy={isPending}
-            onRespond={respondToCase}
-            onAnalyze={analyzeSelectedCase}
-            onMediation={saveMediation}
-            onFinalize={finalizeCase}
-            onAssignRole={assignSpecialist}
-            onSubmitAppeal={fileAppeal}
-            onReviewAppeal={decideAppeal}
-          />
+
+          <section className="panel board-panel" id="board">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Board status</span>
+                <h2>Operational queue</h2>
+              </div>
+              <p>Use this to see what needs intake completion, review, or post-resolution handling.</p>
+            </div>
+            <div className="queue-grid">
+              <div className="queue-card">
+                <span>Intake waiting response</span>
+                <strong>{intakeCount}</strong>
+                <p>Filed matters still waiting on respondent participation.</p>
+              </div>
+              <div className="queue-card">
+                <span>In review</span>
+                <strong>{reviewCount}</strong>
+                <p>Cases currently ready for analysis or mediation operations.</p>
+              </div>
+              <div className="queue-card">
+                <span>Operator</span>
+                <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
+                <p>Current operator address bound to this network deployment.</p>
+              </div>
+            </div>
+          </section>
+
+          <div id="intake">
+            <DisputeWizard disabled={isPending} onCreate={createCase} />
+          </div>
+
+          <div id="detail">
+            <CaseDetail
+              dispute={selectedDispute}
+              operator={platformConfig.operator}
+              connectedAddress={walletAddress}
+              busy={isPending}
+              onRespond={respondToCase}
+              onAnalyze={analyzeSelectedCase}
+              onMediation={saveMediation}
+              onFinalize={finalizeCase}
+              onAssignRole={assignSpecialist}
+              onSubmitAppeal={fileAppeal}
+              onReviewAppeal={decideAppeal}
+            />
+          </div>
         </div>
       </section>
     </main>
