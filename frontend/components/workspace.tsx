@@ -99,13 +99,6 @@ export function Workspace() {
   });
   const hasConnectedWallet = walletAddress !== "";
   const isStudionetReady = chainId.toLowerCase() === "0xf22f";
-  const featuredNotes = selectedDispute
-    ? [
-        selectedDispute.claimantStatement,
-        selectedDispute.issueMap,
-        selectedDispute.draftResolution,
-      ].filter(Boolean).slice(0, 3)
-    : [];
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
   const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
   const intakeCount = disputes.filter((item) => item.stage === "RESPONSE_PENDING").length;
@@ -484,7 +477,7 @@ export function Workspace() {
       <header className="app-header">
         <div className="header-strip">
           <div className="header-strip-left">
-            <span className="header-kicker">Studionet edition</span>
+            <span className="header-kicker">Arbitration workspace</span>
             <span className="masthead-brand masthead-brand-inline">AccordMesh</span>
           </div>
           <form className="header-search" role="search" onSubmit={(event) => event.preventDefault()}>
@@ -568,13 +561,13 @@ export function Workspace() {
           <section className="panel sidebar-intro">
             <div className="section-top compact">
               <div>
-                <span className="eyebrow dark">Categories</span>
-                <h2>Operations and intake</h2>
+                <span className="eyebrow dark">Workspace</span>
+                <h2>Arbitration operations</h2>
               </div>
             </div>
             <p>
-              Browse active files, open a new dispute, review the queue, and move into the full
-              case workspace.
+              Review open matters, start new filings, and move from intake to full dispute
+              handling without leaving the board.
             </p>
           </section>
 
@@ -586,15 +579,41 @@ export function Workspace() {
         </aside>
 
         <div className="content-stack">
-          <section className="panel summary-panel summary-panel-primary portal-hero" id="overview">
-            <div className="summary-copy">
-              <span className="eyebrow solid">Featured desk</span>
-              <h2>{selectedDispute?.title ?? "Live case intake and review desk"}</h2>
+          <section className="panel overview-panel" id="overview">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Overview</span>
+                <h2>{selectedDispute?.title ?? "Dispute operations desk"}</h2>
+              </div>
               <p>
                 {selectedDispute?.claimantStatement ||
-                  "Track intake, evidence handling, appeals, and operator review from a single publication-style operations surface."}
+                  "Use this workspace to intake disputes, review evidence, manage mediation, and finalize outcomes."}
               </p>
             </div>
+
+            <div className="metric-band compact-band">
+              <div className="metric-card dense">
+                <span>Open files</span>
+                <strong>{filteredDisputes.length}</strong>
+                <p>Disputes currently loaded in the active board.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>In review</span>
+                <strong>{reviewCount}</strong>
+                <p>Files ready for analysis, mediation, or assigned review.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Appeals</span>
+                <strong>{appealCount}</strong>
+                <p>Review requests and escalations tracked in this workspace.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Resolution-ready</span>
+                <strong>{resolvedCount}</strong>
+                <p>Files ready for export, oversight, or final handoff.</p>
+              </div>
+            </div>
+
             <div className="summary-actions">
               <a className="button" href="#detail">
                 Open selected file
@@ -629,6 +648,15 @@ export function Workspace() {
                 <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
                 <p>Current operator address bound to this network deployment.</p>
               </div>
+              <div className="queue-card">
+                <span>Selected file</span>
+                <strong>{selectedDispute ? "Loaded" : "None"}</strong>
+                <p>
+                  {selectedDispute
+                    ? `${selectedDispute.caseType} dispute ready in the detailed workspace.`
+                    : "Choose a case from the left board to inspect record details."}
+                </p>
+              </div>
             </div>
           </section>
 
@@ -652,63 +680,6 @@ export function Workspace() {
             />
           </div>
         </div>
-
-        <aside className="right-rail">
-          <section className="panel right-rail-panel">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Tieu diem</span>
-                <h2>Featured file</h2>
-              </div>
-            </div>
-            <div className="highlight-list">
-              {featuredNotes.length ? (
-                featuredNotes.map((note, index) => (
-                  <article className="highlight-item" key={`${index}-${note.slice(0, 24)}`}>
-                    <strong>{index === 0 ? "Lead" : index === 1 ? "Issue map" : "Draft view"}</strong>
-                    <p>{note}</p>
-                  </article>
-                ))
-              ) : (
-                <article className="highlight-item">
-                  <strong>No file selected</strong>
-                  <p>Select a case from the left board to inspect its live highlights here.</p>
-                </article>
-              )}
-            </div>
-          </section>
-
-          <section className="panel right-rail-panel metrics-rail">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Desk snapshot</span>
-                <h2>Today</h2>
-              </div>
-            </div>
-            <div className="metric-cluster">
-              <div className="metric-card dense">
-                <span>Open files</span>
-                <strong>{filteredDisputes.length}</strong>
-                <p>All active records loaded from the current workspace state.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Resolution-ready</span>
-                <strong>{resolvedCount}</strong>
-                <p>Matters already suitable for export and oversight handoff.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Appeals</span>
-                <strong>{appealCount}</strong>
-                <p>Reconsideration requests and review actions tracked on board.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Operator</span>
-                <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
-                <p>Current operator address bound to this network deployment.</p>
-              </div>
-            </div>
-          </section>
-        </aside>
       </section>
     </main>
   );
