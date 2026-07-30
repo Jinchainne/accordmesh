@@ -54,6 +54,7 @@ function formatSyncWarning(message: string) {
 
 export function Workspace() {
   const editionLabel = "Thursday, July 30, 2026";
+  const [searchQuery, setSearchQuery] = useState("");
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
     platformName: "AccordMesh",
@@ -79,6 +80,23 @@ export function Workspace() {
   const [providerRevision, setProviderRevision] = useState(0);
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
+  const filteredDisputes = disputes.filter((item) => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (!keyword) {
+      return true;
+    }
+
+    return [
+      item.title,
+      item.caseType,
+      item.claimantStatement,
+      item.respondent,
+      item.claimant,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(keyword);
+  });
   const hasConnectedWallet = walletAddress !== "";
   const isStudionetReady = chainId.toLowerCase() === "0xf22f";
   const featuredNotes = selectedDispute
@@ -469,15 +487,22 @@ export function Workspace() {
           <span>{editionLabel}</span>
         </div>
         <div className="header-main">
-          <div className="masthead-side">
-            <span className="eyebrow dark">GenLayer dispute desk</span>
+          <div className="masthead-side masthead-logo">
+            <span className="masthead-brand">AccordMesh</span>
+            <span className="masthead-subtitle">GenLayer dispute desk</span>
           </div>
-          <div className="brand-block brand-block-centered">
-            <div>
-              <span className="eyebrow solid">AccordMesh</span>
-              <h1>Dispute operations desk</h1>
-            </div>
-          </div>
+          <form className="header-search" role="search" onSubmit={(event) => event.preventDefault()}>
+            <input
+              aria-label="Search case files"
+              placeholder="Search case title, claimant, respondent..."
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            <button className="button" type="submit">
+              Search
+            </button>
+          </form>
           <div className="header-wallet">
             <WalletPanel
               address={walletAddress}
@@ -562,7 +587,7 @@ export function Workspace() {
           </section>
 
           <CaseList
-            disputes={disputes}
+            disputes={filteredDisputes}
             selectedCaseId={selectedDispute?.id ?? ""}
             onSelect={setSelectedCaseId}
           />
@@ -640,7 +665,7 @@ export function Workspace() {
           <section className="panel right-rail-panel">
             <div className="section-top compact">
               <div>
-                <span className="eyebrow dark">Highlights</span>
+                <span className="eyebrow dark">Tieu diem</span>
                 <h2>Featured file</h2>
               </div>
             </div>
@@ -671,7 +696,7 @@ export function Workspace() {
             <div className="metric-cluster">
               <div className="metric-card dense">
                 <span>Open files</span>
-                <strong>{disputes.length}</strong>
+                <strong>{filteredDisputes.length}</strong>
                 <p>All active records loaded from the current workspace state.</p>
               </div>
               <div className="metric-card dense">

@@ -143,33 +143,61 @@ p {
 
 .header-main {
   display: grid;
-  grid-template-columns: minmax(140px, 0.65fr) minmax(0, 1fr) minmax(320px, 390px);
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 0.95fr) minmax(320px, 390px);
   gap: 10px;
   align-items: center;
-}
-
-.brand-block {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.brand-block h1 {
-  margin: 6px 0 0;
-  font-size: clamp(1.35rem, 2vw, 1.9rem);
-  line-height: 1;
-  font-family: var(--font-display), Georgia, serif;
-  letter-spacing: -0.03em;
-}
-
-.brand-block-centered {
-  justify-content: center;
-  text-align: center;
 }
 
 .masthead-side {
   display: flex;
   align-items: center;
+}
+
+.masthead-logo {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+
+.masthead-brand {
+  color: #0b7f73;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.masthead-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.header-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0;
+  align-items: center;
+}
+
+.header-search input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(18, 48, 68, 0.16);
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.header-search .button {
+  min-height: 44px;
+  border-radius: 0 10px 10px 0;
+  padding: 0 18px;
 }
 
 .brand-mark {
@@ -1104,6 +1132,17 @@ p {
     flex-direction: column;
   }
 
+  .header-search {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .header-search input,
+  .header-search .button {
+    border-radius: 10px;
+    border-right: 1px solid rgba(18, 48, 68, 0.16);
+  }
+
   .wallet-compact-main {
     flex-direction: column;
     align-items: stretch;
@@ -1128,7 +1167,6 @@ p {
     border-radius: 24px;
   }
 
-  .brand-block h1,
   .case-header h2 {
     font-size: 34px;
   }
@@ -1141,29 +1179,11 @@ p {
     padding: 14px;
   }
 
-  .brand-block {
-    align-items: start;
+  .masthead-brand {
+    font-size: 1.5rem;
   }
 
-  .brand-mark {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    font-size: 20px;
-  }
-
-  .brand-block h1 {
-    font-size: 22px;
-    line-height: 1.15;
-  }
-
-  .brand-block p {
-    margin-left: 0;
-    margin-right: 0;
-    text-align: left;
-  }
-
-  .brand-block-centered,
+  .masthead-logo,
   .wallet-compact-bar,
   .header-bar {
     flex-direction: column;
