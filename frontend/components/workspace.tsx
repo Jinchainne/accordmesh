@@ -5,6 +5,7 @@ import { appConfig } from "../lib/genlayer/config";
 import {
   ACCORDMESH_PROVIDER_EVENT,
   getBrowserProvider,
+  getBrowserProviders,
   getDetectedWalletLabels,
   rememberBrowserProvider,
   waitForBrowserProviders,
@@ -344,7 +345,10 @@ export function Workspace() {
   });
 
   async function connectWallet() {
-    const providers = await waitForBrowserProviders();
+    const immediateProviders = getBrowserProviders();
+    const providers = immediateProviders.length
+      ? immediateProviders
+      : await waitForBrowserProviders(1, 150);
     if (!providers.length) {
       setWalletMessage("No injected browser wallet was found. Install MetaMask or OKX Wallet, or reopen this page in your wallet browser.");
       await inspectWallet();
@@ -508,9 +512,6 @@ export function Workspace() {
                 });
               }}
             />
-            <a className="button" href="#intake">
-              New file
-            </a>
           </div>
         </div>
       </header>
@@ -541,6 +542,32 @@ export function Workspace() {
             <a href="#intake">New dispute</a>
             <a href="#detail">Case detail</a>
           </nav>
+
+          <section className="panel sidebar-actions-panel">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Actions</span>
+                <h2>Quick actions</h2>
+              </div>
+            </div>
+            <div className="sidebar-actions">
+              <button
+                className="button secondary sidebar-action-button"
+                type="button"
+                onClick={() => {
+                  startTransition(async () => {
+                    await refreshData();
+                  });
+                }}
+                disabled={isPending}
+              >
+                Refresh cases
+              </button>
+              <a className="button sidebar-action-button" href="#intake">
+                New file
+              </a>
+            </div>
+          </section>
 
           <section className="panel sidebar-intro">
             <div className="section-top compact">

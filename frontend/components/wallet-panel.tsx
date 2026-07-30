@@ -57,9 +57,6 @@ export function WalletPanel({
               <button className="button" type="button" onClick={onConnect} disabled={isBusy || !canConnect}>
                 {connectLabel}
               </button>
-              <button className="button secondary" type="button" onClick={onRefresh} disabled={isBusy}>
-                Refresh cases
-              </button>
             </div>
           </div>
           <div className="wallet-panel-feedback wallet-panel-feedback-compact">

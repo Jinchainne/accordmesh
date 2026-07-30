@@ -285,6 +285,16 @@ p {
   font-family: var(--font-display), Georgia, serif;
 }
 
+.sidebar-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-action-button {
+  width: 100%;
+  justify-content: center;
+}
+
 .sidebar-intro p {
   margin: 0;
 }
