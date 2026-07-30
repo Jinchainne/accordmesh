@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { appConfig } from "../lib/genlayer/config";
 import {
   ACCORDMESH_PROVIDER_EVENT,
@@ -114,7 +114,7 @@ export function Workspace() {
     setWarningMessage(formatSyncWarning(snapshot.warnings.join(" ")));
   }
 
-  const refreshData = useEffectEvent(async () => {
+  const refreshData = useCallback(async () => {
     try {
       setErrorMessage("");
       setWarningMessage("");
@@ -122,7 +122,7 @@ export function Workspace() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load disputes.");
     }
-  });
+  }, []);
 
   useEffect(() => {
     startTransition(async () => {
@@ -130,7 +130,7 @@ export function Workspace() {
     });
   }, [refreshData]);
 
-  const inspectWallet = useEffectEvent(async () => {
+  const inspectWallet = useCallback(async () => {
     const provider = getActiveBrowserProvider();
     if (!provider) {
       setWalletDiagnostics([
@@ -221,9 +221,9 @@ export function Workspace() {
     }
 
     setWalletDiagnostics(nextDiagnostics);
-  });
+  }, []);
 
-  const syncWalletState = useEffectEvent(async () => {
+  const syncWalletState = useCallback(async () => {
     const provider = getActiveBrowserProvider();
     if (!provider) {
       setWalletMessage("No injected browser wallet was found in this browser.");
@@ -241,7 +241,7 @@ export function Workspace() {
         : "Wallet detected. Connect your wallet to sign transactions.",
     );
     await inspectWallet();
-  });
+  }, [inspectWallet]);
 
   useEffect(() => {
     void syncWalletState();
@@ -284,7 +284,7 @@ export function Workspace() {
     };
   }, [providerRevision, syncWalletState]);
 
-  const ensureStudionet = useEffectEvent(async (providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>) => {
+  const ensureStudionet = useCallback(async (providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>) => {
     const provider = providerOverride ?? getActiveBrowserProvider();
     if (!provider) {
       throw new Error("No browser wallet detected.");
@@ -315,9 +315,9 @@ export function Workspace() {
         ],
       });
     }
-  });
+  }, []);
 
-  const prepareConnectedWallet = useEffectEvent(
+  const prepareConnectedWallet = useCallback(
     async (
       address: string,
       providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>,
@@ -355,7 +355,7 @@ export function Workspace() {
         },
       ]);
     }
-  });
+  }, [inspectWallet]);
 
   async function connectWallet() {
     const injectedProvider = getInjectedEthereum();
