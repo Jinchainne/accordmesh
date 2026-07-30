@@ -38,6 +38,13 @@ a {
   text-decoration: none;
 }
 
+#overview,
+#board,
+#intake,
+#detail {
+  scroll-margin-top: 140px;
+}
+
 p {
   line-height: 1.65;
 }
@@ -106,6 +113,9 @@ p {
   justify-content: space-between;
   gap: 20px;
   align-items: center;
+  position: sticky;
+  top: 16px;
+  z-index: 40;
   padding: 18px 22px;
   border: 1px solid var(--line);
   border-radius: 28px;
@@ -146,6 +156,52 @@ p {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.wallet-panel-compact {
+  min-width: min(100%, 420px);
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 245, 0.9), rgba(246, 236, 221, 0.96)),
+    var(--bg-panel);
+  box-shadow: var(--shadow);
+}
+
+.wallet-panel-top {
+  margin-bottom: 10px;
+}
+
+.wallet-panel-top h2 {
+  margin: 10px 0 0;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.wallet-panel-grid {
+  gap: 10px;
+}
+
+.wallet-panel-compact .status-row {
+  padding-bottom: 6px;
+}
+
+.wallet-panel-compact .stage-card {
+  padding: 14px;
+}
+
+.wallet-panel-actions {
+  margin-top: 12px;
+}
+
+.wallet-panel-compact .button {
+  padding: 11px 16px;
+}
+
+.wallet-diagnostic-list-compact {
+  min-height: 0;
 }
 
 .header-chip {
@@ -807,6 +863,15 @@ p {
   .case-header,
   .app-header {
     flex-direction: column;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .wallet-panel-compact {
+    width: 100%;
   }
 }
 

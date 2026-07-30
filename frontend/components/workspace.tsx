@@ -438,13 +438,29 @@ export function Workspace() {
           </div>
         </div>
         <div className="header-actions">
+          <WalletPanel
+            address={walletAddress}
+            chainId={chainId}
+            hasWallet={Boolean(getBrowserProvider())}
+            isConnected={hasConnectedWallet}
+            isBusy={isPending}
+            networkName={appConfig.networkName}
+            rpcUrl={appConfig.rpcUrl}
+            message={walletMessage}
+            canConnect={Boolean(getBrowserProvider())}
+            connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
+            diagnostics={walletDiagnostics}
+            variant="compact"
+            onConnect={connectWallet}
+            onRefresh={() => {
+              startTransition(async () => {
+                await refreshData();
+              });
+            }}
+          />
           <div className="header-chip">
             <span>Network</span>
             <strong>{appConfig.networkName}</strong>
-          </div>
-          <div className="header-chip">
-            <span>Mode</span>
-            <strong>{appConfig.mode}</strong>
           </div>
           <a className="button" href="#intake">
             New file
@@ -482,27 +498,6 @@ export function Workspace() {
             <a href="#intake">Open new file</a>
             <a href="#detail">Case workspace</a>
           </nav>
-
-          <WalletPanel
-            address={walletAddress}
-            chainId={chainId}
-            hasWallet={Boolean(getBrowserProvider())}
-            isConnected={hasConnectedWallet}
-            isBusy={isPending}
-            mode={appConfig.mode}
-            networkName={appConfig.networkName}
-            rpcUrl={appConfig.rpcUrl}
-            message={walletMessage}
-            canConnect={Boolean(getBrowserProvider())}
-            connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
-            diagnostics={walletDiagnostics}
-            onConnect={connectWallet}
-            onRefresh={() => {
-              startTransition(async () => {
-                await refreshData();
-              });
-            }}
-          />
 
           <CaseList
             disputes={disputes}
