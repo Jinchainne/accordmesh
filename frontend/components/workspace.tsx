@@ -7,6 +7,10 @@ import {
   getBrowserProvider,
   getBrowserProviders,
   getDetectedWalletLabels,
+  getMetaMaskProvider,
+  getOkxProvider,
+  hasDedicatedMetaMaskProvider,
+  hasOkxProvider,
   rememberBrowserProvider,
   waitForBrowserProviders,
 } from "../lib/genlayer/wallet";
@@ -403,6 +407,44 @@ export function Workspace() {
     ]);
   }
 
+  async function connectNamedWallet(kind: "metamask" | "okx") {
+    const provider = kind === "metamask" ? getMetaMaskProvider() : getOkxProvider();
+    if (!provider) {
+      setWalletMessage(
+        kind === "metamask"
+          ? "MetaMask was not detected in this browser."
+          : "OKX Wallet was not detected in this browser.",
+      );
+      await inspectWallet();
+      return;
+    }
+
+    try {
+      rememberBrowserProvider(provider);
+      setWalletMessage(`Requesting ${kind === "metamask" ? "MetaMask" : "OKX Wallet"} access...`);
+      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const nextAddress = accounts[0] ?? "";
+
+      if (!nextAddress) {
+        throw new Error("Wallet detected, but no account was returned.");
+      }
+
+      await prepareConnectedWallet(nextAddress);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Wallet access request failed.";
+      setErrorMessage(message);
+      setWalletMessage(message);
+      setWalletDiagnostics((current) => [
+        ...current.filter((item) => item.label !== "Connect step"),
+        {
+          label: "Connect step",
+          value: `${kind === "metamask" ? "MetaMask" : "OKX Wallet"}: ${message}`,
+          tone: "danger",
+        },
+      ]);
+    }
+  }
+
   async function handleWalletAction() {
     if (!hasConnectedWallet) {
       await connectWallet();
@@ -490,6 +532,8 @@ export function Workspace() {
               address={walletAddress}
               chainId={chainId}
               hasWallet={Boolean(getBrowserProvider())}
+              hasMetaMask={hasDedicatedMetaMaskProvider()}
+              hasOkx={hasOkxProvider()}
               isConnected={hasConnectedWallet}
               isReady={isStudionetReady}
               isBusy={isPending}
@@ -507,6 +551,12 @@ export function Workspace() {
               diagnostics={walletDiagnostics}
               variant="compact"
               onConnect={handleWalletAction}
+              onConnectMetaMask={() => {
+                void connectNamedWallet("metamask");
+              }}
+              onConnectOkx={() => {
+                void connectNamedWallet("okx");
+              }}
               onRefresh={() => {
                 startTransition(async () => {
                   await refreshData();

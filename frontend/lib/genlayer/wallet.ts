@@ -57,6 +57,10 @@ function isOkxProvider(provider: EthereumProvider) {
   return Boolean(provider.isOkxWallet || provider.isOKExWallet);
 }
 
+function isMetaMaskProvider(provider: EthereumProvider) {
+  return Boolean(provider.isMetaMask && !provider.isRabby);
+}
+
 function requestEip6963Providers() {
   if (typeof window === "undefined") {
     return;
@@ -297,6 +301,51 @@ export function hasDedicatedMetaMaskProvider() {
 
   return Boolean(
     Array.from(discoveredProviders.values()).find((detail) => isMetaMaskDetail(detail) && !detail.provider.isRabby) ||
-      getAllProviders().find((provider) => provider.isMetaMask && !provider.isRabby),
+      getAllProviders().find((provider) => isMetaMaskProvider(provider)),
   );
+}
+
+export function getMetaMaskProvider() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  primeBrowserProviders();
+
+  const discovered = Array.from(discoveredProviders.values()).find(
+    (detail) => isMetaMaskDetail(detail) && !detail.provider.isRabby,
+  );
+  if (discovered?.provider) {
+    return discovered.provider;
+  }
+
+  return getAllProviders().find((provider) => isMetaMaskProvider(provider)) ?? null;
+}
+
+export function hasOkxProvider() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  primeBrowserProviders();
+
+  return Boolean(
+    Array.from(discoveredProviders.values()).find((detail) => isOkxDetail(detail)) ||
+      getAllProviders().find((provider) => isOkxProvider(provider)),
+  );
+}
+
+export function getOkxProvider() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  primeBrowserProviders();
+
+  const discovered = Array.from(discoveredProviders.values()).find((detail) => isOkxDetail(detail));
+  if (discovered?.provider) {
+    return discovered.provider;
+  }
+
+  return getAllProviders().find((provider) => isOkxProvider(provider)) ?? null;
 }

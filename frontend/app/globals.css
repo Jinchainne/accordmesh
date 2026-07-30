@@ -218,6 +218,18 @@ p {
   flex-wrap: nowrap;
 }
 
+.wallet-provider-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wallet-provider-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .wallet-panel-compact .button {
   min-height: 34px;
   padding: 0 12px;
@@ -969,6 +981,10 @@ p {
 
   .wallet-panel-actions {
     flex-wrap: wrap;
+  }
+
+  .wallet-provider-buttons {
+    width: 100%;
   }
 }
 
