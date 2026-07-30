@@ -14,10 +14,10 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
     <section className="panel">
       <div className="section-top compact">
         <div>
-          <span className="eyebrow dark">Case board</span>
-          <h2>Active files</h2>
+          <span className="eyebrow dark">Cases</span>
+          <h2>Open files</h2>
         </div>
-        <p>{disputes.length} records across intake, mediation, appeal, and regulator review.</p>
+        <p>{disputes.length} matters loaded.</p>
       </div>
       <div className="list">
         {disputes.map((dispute) => (
@@ -30,7 +30,7 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
             <div className="meta">
               <span className="badge">{getStageLabel(dispute.stage)}</span>
               <span>{dispute.caseType}</span>
-              <span>{dispute.appeals.length} appeals</span>
+              <span>{dispute.appeals.length} appeal{dispute.appeals.length === 1 ? "" : "s"}</span>
             </div>
             <div className="case-card-top">
               <h3>{dispute.title}</h3>
@@ -39,8 +39,8 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
             <p>{dispute.claimantStatement}</p>
             <div className="case-rail" />
             <div className="meta">
-              <span>{dispute.claimantEvidenceUrls.length} claimant exhibits</span>
-              <span>{dispute.respondentEvidenceUrls.length} respondent exhibits</span>
+              <span>{dispute.claimantEvidenceUrls.length} claimant items</span>
+              <span>{dispute.respondentEvidenceUrls.length} respondent items</span>
             </div>
           </button>
         ))}

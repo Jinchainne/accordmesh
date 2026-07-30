@@ -53,7 +53,6 @@ function formatSyncWarning(message: string) {
 }
 
 export function Workspace() {
-  const editionLabel = "Thursday, July 30, 2026";
   const [searchQuery, setSearchQuery] = useState("");
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
@@ -477,7 +476,7 @@ export function Workspace() {
       <header className="app-header">
         <div className="header-strip">
           <div className="header-strip-left">
-            <span className="header-kicker">Arbitration workspace</span>
+            <span className="header-kicker">Workspace</span>
             <span className="masthead-brand masthead-brand-inline">AccordMesh</span>
           </div>
           <form className="header-search" role="search" onSubmit={(event) => event.preventDefault()}>
@@ -552,23 +551,20 @@ export function Workspace() {
       <section className="workspace-layout">
         <aside className="sidebar">
           <nav className="panel section-nav" aria-label="Workspace sections">
-            <a href="#overview">Overview</a>
-            <a href="#board">Case board</a>
-            <a href="#intake">Open new file</a>
-            <a href="#detail">Case workspace</a>
+            <a href="#overview">Dashboard</a>
+            <a href="#board">Queue</a>
+            <a href="#intake">New dispute</a>
+            <a href="#detail">Case detail</a>
           </nav>
 
           <section className="panel sidebar-intro">
             <div className="section-top compact">
               <div>
-                <span className="eyebrow dark">Workspace</span>
-                <h2>Arbitration operations</h2>
+                <span className="eyebrow dark">Desk</span>
+                <h2>Dispute workflow</h2>
               </div>
             </div>
-            <p>
-              Review open matters, start new filings, and move from intake to full dispute
-              handling without leaving the board.
-            </p>
+            <p>Review matters, open disputes, and continue into the full record.</p>
           </section>
 
           <CaseList
@@ -582,35 +578,32 @@ export function Workspace() {
           <section className="panel overview-panel" id="overview">
             <div className="section-top compact">
               <div>
-                <span className="eyebrow dark">Overview</span>
-                <h2>{selectedDispute?.title ?? "Dispute operations desk"}</h2>
+                <span className="eyebrow dark">Dashboard</span>
+                <h2>{selectedDispute?.title ?? "Dispute desk"}</h2>
               </div>
-              <p>
-                {selectedDispute?.claimantStatement ||
-                  "Use this workspace to intake disputes, review evidence, manage mediation, and finalize outcomes."}
-              </p>
+              <p>{selectedDispute ? selectedDispute.caseType : "Live arbitration workspace"}</p>
             </div>
 
             <div className="metric-band compact-band">
               <div className="metric-card dense">
                 <span>Open files</span>
                 <strong>{filteredDisputes.length}</strong>
-                <p>Disputes currently loaded in the active board.</p>
+                <p>Loaded in this workspace.</p>
               </div>
               <div className="metric-card dense">
                 <span>In review</span>
                 <strong>{reviewCount}</strong>
-                <p>Files ready for analysis, mediation, or assigned review.</p>
+                <p>Ready for review.</p>
               </div>
               <div className="metric-card dense">
                 <span>Appeals</span>
                 <strong>{appealCount}</strong>
-                <p>Review requests and escalations tracked in this workspace.</p>
+                <p>Escalations on record.</p>
               </div>
               <div className="metric-card dense">
-                <span>Resolution-ready</span>
+                <span>Ready</span>
                 <strong>{resolvedCount}</strong>
-                <p>Files ready for export, oversight, or final handoff.</p>
+                <p>Ready for handoff.</p>
               </div>
             </div>
 
@@ -627,34 +620,34 @@ export function Workspace() {
           <section className="panel board-panel" id="board">
             <div className="section-top compact">
               <div>
-                <span className="eyebrow dark">Board status</span>
-                <h2>Operational queue</h2>
+                <span className="eyebrow dark">Queue</span>
+                <h2>Case board</h2>
               </div>
-              <p>Use this to see what needs intake completion, review, or post-resolution handling.</p>
+              <p>What still needs action.</p>
             </div>
             <div className="queue-grid">
               <div className="queue-card">
-                <span>Intake waiting response</span>
+                <span>Waiting response</span>
                 <strong>{intakeCount}</strong>
-                <p>Filed matters still waiting on respondent participation.</p>
+                <p>Awaiting respondent participation.</p>
               </div>
               <div className="queue-card">
                 <span>In review</span>
                 <strong>{reviewCount}</strong>
-                <p>Cases currently ready for analysis or mediation operations.</p>
+                <p>Ready for analysis or mediation.</p>
               </div>
               <div className="queue-card">
                 <span>Operator</span>
                 <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
-                <p>Current operator address bound to this network deployment.</p>
+                <p>Bound to this deployment.</p>
               </div>
               <div className="queue-card">
-                <span>Selected file</span>
+                <span>Selected</span>
                 <strong>{selectedDispute ? "Loaded" : "None"}</strong>
                 <p>
                   {selectedDispute
-                    ? `${selectedDispute.caseType} dispute ready in the detailed workspace.`
-                    : "Choose a case from the left board to inspect record details."}
+                    ? `${selectedDispute.caseType} file open below.`
+                    : "Choose a case from the left rail."}
                 </p>
               </div>
             </div>

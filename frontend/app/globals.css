@@ -145,6 +145,7 @@ p {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .masthead-brand {
@@ -341,6 +342,10 @@ p {
   border-bottom: 1px solid rgba(20, 41, 58, 0.08);
 }
 
+.section-nav a:last-child {
+  border-bottom: 0;
+}
+
 .stack {
   display: grid;
   gap: 20px;
@@ -365,9 +370,18 @@ p {
 
 .overview-panel h2 {
   margin: 10px 0 0;
-  font-size: 36px;
+  font-size: 32px;
   line-height: 1.02;
   font-family: var(--font-display), Georgia, serif;
+}
+
+.overview-panel .section-top p,
+.board-panel .section-top p,
+.sidebar-intro p,
+.case-card .meta,
+.metric-card p,
+.queue-card p {
+  line-height: 1.5;
 }
 
 .board-panel {
@@ -671,7 +685,7 @@ p {
 }
 
 .metric-card.dense {
-  min-height: 142px;
+  min-height: 124px;
 }
 
 .metric-card p,
@@ -1021,7 +1035,7 @@ p {
   }
 
   .overview-panel h2 {
-    font-size: 30px;
+    font-size: 28px;
   }
 
   .header-strip-right,
