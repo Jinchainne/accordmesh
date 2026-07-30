@@ -81,6 +81,13 @@ export function Workspace() {
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
   const hasConnectedWallet = walletAddress !== "";
   const isStudionetReady = chainId.toLowerCase() === "0xf22f";
+  const featuredNotes = selectedDispute
+    ? [
+        selectedDispute.claimantStatement,
+        selectedDispute.issueMap,
+        selectedDispute.draftResolution,
+      ].filter(Boolean).slice(0, 3)
+    : [];
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
   const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
   const intakeCount = disputes.filter((item) => item.stage === "RESPONSE_PENDING").length;
@@ -534,25 +541,25 @@ export function Workspace() {
 
       <section className="workspace-layout">
         <aside className="sidebar">
-          <section className="panel sidebar-intro">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Operations</span>
-                <h2>Run intake, review, appeals, and handoff from one board.</h2>
-              </div>
-            </div>
-            <p>
-              A casework console for marketplaces and operators that need evidence handling,
-              specialist routing, and regulator-ready outputs.
-            </p>
-          </section>
-
           <nav className="panel section-nav" aria-label="Workspace sections">
             <a href="#overview">Overview</a>
             <a href="#board">Case board</a>
             <a href="#intake">Open new file</a>
             <a href="#detail">Case workspace</a>
           </nav>
+
+          <section className="panel sidebar-intro">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Categories</span>
+                <h2>Operations and intake</h2>
+              </div>
+            </div>
+            <p>
+              Browse active files, open a new dispute, review the queue, and move into the full
+              case workspace.
+            </p>
+          </section>
 
           <CaseList
             disputes={disputes}
@@ -562,42 +569,22 @@ export function Workspace() {
         </aside>
 
         <div className="content-stack">
-          <section className="overview-grid" id="overview">
-            <div className="panel summary-panel summary-panel-primary">
-              <div className="summary-copy">
-                <span className="eyebrow solid">Live workspace</span>
-                <h2>Teams get one operating surface instead of a static showcase page.</h2>
-                <p>
-                  Intake, neutral analysis, assigned counsel, reviewer oversight, appeals, and
-                  regulator export stay inside the same procedural record.
-                </p>
-              </div>
-              <div className="summary-actions">
-                <a className="button" href="#detail">
-                  Open selected file
-                </a>
-                <a className="button secondary" href="#intake">
-                  Start intake
-                </a>
-              </div>
+          <section className="panel summary-panel summary-panel-primary portal-hero" id="overview">
+            <div className="summary-copy">
+              <span className="eyebrow solid">Featured desk</span>
+              <h2>{selectedDispute?.title ?? "Live case intake and review desk"}</h2>
+              <p>
+                {selectedDispute?.claimantStatement ||
+                  "Track intake, evidence handling, appeals, and operator review from a single publication-style operations surface."}
+              </p>
             </div>
-
-            <div className="metric-cluster">
-              <div className="metric-card dense">
-                <span>Open files</span>
-                <strong>{disputes.length}</strong>
-                <p>All active records loaded from the current workspace state.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Resolution-ready</span>
-                <strong>{resolvedCount}</strong>
-                <p>Matters already suitable for export and oversight handoff.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Appeals</span>
-                <strong>{appealCount}</strong>
-                <p>Reconsideration requests and review actions tracked on board.</p>
-              </div>
+            <div className="summary-actions">
+              <a className="button" href="#detail">
+                Open selected file
+              </a>
+              <a className="button secondary" href="#intake">
+                Start intake
+              </a>
             </div>
           </section>
 
@@ -648,6 +635,63 @@ export function Workspace() {
             />
           </div>
         </div>
+
+        <aside className="right-rail">
+          <section className="panel right-rail-panel">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Highlights</span>
+                <h2>Featured file</h2>
+              </div>
+            </div>
+            <div className="highlight-list">
+              {featuredNotes.length ? (
+                featuredNotes.map((note, index) => (
+                  <article className="highlight-item" key={`${index}-${note.slice(0, 24)}`}>
+                    <strong>{index === 0 ? "Lead" : index === 1 ? "Issue map" : "Draft view"}</strong>
+                    <p>{note}</p>
+                  </article>
+                ))
+              ) : (
+                <article className="highlight-item">
+                  <strong>No file selected</strong>
+                  <p>Select a case from the left board to inspect its live highlights here.</p>
+                </article>
+              )}
+            </div>
+          </section>
+
+          <section className="panel right-rail-panel metrics-rail">
+            <div className="section-top compact">
+              <div>
+                <span className="eyebrow dark">Desk snapshot</span>
+                <h2>Today</h2>
+              </div>
+            </div>
+            <div className="metric-cluster">
+              <div className="metric-card dense">
+                <span>Open files</span>
+                <strong>{disputes.length}</strong>
+                <p>All active records loaded from the current workspace state.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Resolution-ready</span>
+                <strong>{resolvedCount}</strong>
+                <p>Matters already suitable for export and oversight handoff.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Appeals</span>
+                <strong>{appealCount}</strong>
+                <p>Reconsideration requests and review actions tracked on board.</p>
+              </div>
+              <div className="metric-card dense">
+                <span>Operator</span>
+                <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
+                <p>Current operator address bound to this network deployment.</p>
+              </div>
+            </div>
+          </section>
+        </aside>
       </section>
     </main>
   );
