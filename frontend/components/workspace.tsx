@@ -502,12 +502,6 @@ export function Workspace() {
           </div>
         </div>
         <div className="header-bar">
-          <nav className="top-nav">
-            <a href="#overview">Overview</a>
-            <a href="#board">Case board</a>
-            <a href="#intake">Open new file</a>
-            <a href="#detail">Case workspace</a>
-          </nav>
           <div className="header-actions">
             <div className="header-chip">
               <span>Network</span>
@@ -552,6 +546,13 @@ export function Workspace() {
               specialist routing, and regulator-ready outputs.
             </p>
           </section>
+
+          <nav className="panel section-nav" aria-label="Workspace sections">
+            <a href="#overview">Overview</a>
+            <a href="#board">Case board</a>
+            <a href="#intake">Open new file</a>
+            <a href="#detail">Case workspace</a>
+          </nav>
 
           <CaseList
             disputes={disputes}
