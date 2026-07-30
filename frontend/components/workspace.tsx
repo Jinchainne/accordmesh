@@ -44,6 +44,21 @@ const idleTransaction: TransactionState = {
   label: "",
 };
 
+function formatSyncWarning(message: string) {
+  if (!message) {
+    return "";
+  }
+
+  const normalized = message
+    .replaceAll("An unknown RPC error occurred. Details: Failed to fetch Version: viem@2.55.10", "RPC unavailable")
+    .replaceAll("Case board sync failed:", "Case board offline:")
+    .replaceAll("Platform config sync failed:", "Platform config offline:")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized;
+}
+
 export function Workspace() {
   const editionLabel = "Thursday, July 30, 2026";
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
@@ -90,7 +105,7 @@ export function Workspace() {
         : (snapshot.disputes[0]?.id ?? ""),
     );
 
-    setWarningMessage(snapshot.warnings.join(" "));
+    setWarningMessage(formatSyncWarning(snapshot.warnings.join(" ")));
   }
 
   const refreshData = useEffectEvent(async () => {
@@ -516,9 +531,9 @@ export function Workspace() {
       <div className="header-spacer" aria-hidden="true" />
 
       {warningMessage ? (
-        <section className="panel warning-panel">
-          <h2>Live sync notice</h2>
-          <p>{warningMessage}</p>
+        <section className="warning-banner" role="status" aria-live="polite">
+          <strong>Live sync notice</strong>
+          <span>{warningMessage}</span>
         </section>
       ) : null}
 
