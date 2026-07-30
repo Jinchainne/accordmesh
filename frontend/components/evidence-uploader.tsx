@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 
 type EvidenceUploaderProps = {
   disabled?: boolean;
@@ -8,6 +8,7 @@ type EvidenceUploaderProps = {
 };
 
 export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps) {
+  const inputId = useId();
   const [provider, setProvider] = useState<"browser" | "ipfs" | "drive">("browser");
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState("");
@@ -140,12 +141,22 @@ export function EvidenceUploader({ disabled, onUploaded }: EvidenceUploaderProps
             Google Drive{providerStatus.drive ? "" : " (not configured)"}
           </option>
         </select>
-        <input
-          type="file"
-          multiple
-          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
-          disabled={disabled || isPending}
-        />
+        <div className="file-picker">
+          <input
+            id={inputId}
+            className="file-input"
+            type="file"
+            multiple
+            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+            disabled={disabled || isPending}
+          />
+          <label className={`file-picker-button ${disabled || isPending ? "is-disabled" : ""}`} htmlFor={inputId}>
+            Choose files
+          </label>
+          <div className="file-picker-summary">
+            {files.length ? `${files.length} file(s) selected` : "No file chosen"}
+          </div>
+        </div>
         <button
           className="button secondary"
           type="button"

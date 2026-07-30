@@ -45,6 +45,7 @@ const idleTransaction: TransactionState = {
 };
 
 export function Workspace() {
+  const editionLabel = "Thursday, July 30, 2026";
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
     platformName: "AccordMesh",
@@ -65,11 +66,13 @@ export function Workspace() {
   ]);
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const [providerRevision, setProviderRevision] = useState(0);
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
   const hasConnectedWallet = walletAddress !== "";
+  const isStudionetReady = chainId.toLowerCase() === "0xf22f";
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
   const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
   const intakeCount = disputes.filter((item) => item.stage === "RESPONSE_PENDING").length;
@@ -87,14 +90,13 @@ export function Workspace() {
         : (snapshot.disputes[0]?.id ?? ""),
     );
 
-    if (snapshot.warnings.length) {
-      setErrorMessage(snapshot.warnings.join(" "));
-    }
+    setWarningMessage(snapshot.warnings.join(" "));
   }
 
   const refreshData = useEffectEvent(async () => {
     try {
       setErrorMessage("");
+      setWarningMessage("");
       await loadData();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load disputes.");
@@ -370,6 +372,23 @@ export function Workspace() {
     ]);
   }
 
+  async function handleWalletAction() {
+    if (!hasConnectedWallet) {
+      await connectWallet();
+      return;
+    }
+
+    try {
+      setWalletMessage("Switching wallet to Studionet...");
+      await ensureStudionet();
+      await syncWalletState();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to switch wallet network.";
+      setErrorMessage(message);
+      setWalletMessage(message);
+    }
+  }
+
   async function runMutation(label: string, task: () => Promise<string>) {
     setTransaction({
       phase: "pending",
@@ -430,12 +449,19 @@ export function Workspace() {
   return (
     <main className="shell shell-app">
       <header className="app-header">
+        <div className="masthead-line">
+          <span>Studionet edition</span>
+          <span>{editionLabel}</span>
+        </div>
         <div className="header-main">
-          <div className="brand-block">
-            <div className="brand-mark">A</div>
+          <div className="masthead-side">
+            <span className="eyebrow dark">GenLayer dispute desk</span>
+          </div>
+          <div className="brand-block brand-block-centered">
             <div>
               <span className="eyebrow solid">AccordMesh</span>
-              <h1>Dispute operations workspace</h1>
+              <h1>Dispute operations desk</h1>
+              <p>Live case intake, evidence handling, mediation, appeals, and operator review.</p>
             </div>
           </div>
           <div className="header-wallet">
@@ -444,15 +470,22 @@ export function Workspace() {
               chainId={chainId}
               hasWallet={Boolean(getBrowserProvider())}
               isConnected={hasConnectedWallet}
+              isReady={isStudionetReady}
               isBusy={isPending}
               networkName={appConfig.networkName}
               rpcUrl={appConfig.rpcUrl}
               message={walletMessage}
-              canConnect={Boolean(getBrowserProvider())}
-              connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
+              canConnect={true}
+              connectLabel={
+                hasConnectedWallet
+                  ? isStudionetReady
+                    ? "Refresh wallet"
+                    : "Switch to Studionet"
+                  : "Connect wallet"
+              }
               diagnostics={walletDiagnostics}
               variant="compact"
-              onConnect={connectWallet}
+              onConnect={handleWalletAction}
               onRefresh={() => {
                 startTransition(async () => {
                   await refreshData();
@@ -482,9 +515,16 @@ export function Workspace() {
 
       <div className="header-spacer" aria-hidden="true" />
 
+      {warningMessage ? (
+        <section className="panel warning-panel">
+          <h2>Live sync notice</h2>
+          <p>{warningMessage}</p>
+        </section>
+      ) : null}
+
       {errorMessage ? (
         <section className="panel error-panel">
-          <h2>Load error</h2>
+          <h2>Action error</h2>
           <p>{errorMessage}</p>
         </section>
       ) : null}

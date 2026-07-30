@@ -5,6 +5,7 @@ type WalletPanelProps = {
   chainId: string;
   hasWallet: boolean;
   isConnected: boolean;
+  isReady: boolean;
   isBusy: boolean;
   networkName: string;
   rpcUrl: string;
@@ -22,6 +23,7 @@ export function WalletPanel({
   chainId,
   hasWallet,
   isConnected,
+  isReady,
   isBusy,
   networkName,
   rpcUrl,
@@ -35,6 +37,7 @@ export function WalletPanel({
 }: WalletPanelProps) {
   const isCompact = variant === "compact";
   const compactDiagnostics = diagnostics.slice(0, 4);
+  const shortAddress = isConnected ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
 
   return (
     <section className={`wallet-panel ${isCompact ? "wallet-panel-compact" : "panel"}`}>
@@ -43,11 +46,11 @@ export function WalletPanel({
           <div className="wallet-compact-head">
             <div>
               <span className="eyebrow solid">Wallet access</span>
-              <h2>{isConnected ? "Connected wallet" : "Connect wallet"}</h2>
+              <h2>{isConnected ? "Signer ready" : "Connect wallet"}</h2>
             </div>
             <div className="wallet-compact-badges">
-              <span className={`badge ${isConnected ? "" : "warn"}`}>
-                {isConnected ? "Ready" : "Pending"}
+              <span className={`badge ${isReady ? "" : isConnected ? "warn" : "warn"}`}>
+                {isReady ? "Studionet ready" : isConnected ? "Needs switch" : "Pending"}
               </span>
               <span className={`badge ${hasWallet ? "" : "danger"}`}>
                 {hasWallet ? "Detected" : "Missing"}
@@ -55,7 +58,7 @@ export function WalletPanel({
             </div>
           </div>
           <div className="wallet-compact-address">
-            <strong>{isConnected ? address : "Connect an EVM wallet to sign transactions."}</strong>
+            <strong>{isConnected ? shortAddress : "Connect an EVM wallet to sign transactions."}</strong>
             <span>
               {chainId ? `Chain ${chainId}` : "Chain unavailable"} · {networkName}
             </span>
@@ -71,14 +74,17 @@ export function WalletPanel({
           <div className="wallet-panel-feedback">
             {message ? <p className="tiny-note">{message}</p> : <p className="tiny-note wallet-feedback-placeholder" />}
           </div>
-          <div className="wallet-compact-diagnostics">
-            {compactDiagnostics.map((item) => (
-              <div className={`diagnostic-row ${item.tone ?? "default"}`} key={item.label}>
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </div>
-            ))}
-          </div>
+          <details className="wallet-compact-details">
+            <summary>Connection details</summary>
+            <div className="wallet-compact-diagnostics">
+              {compactDiagnostics.map((item) => (
+                <div className={`diagnostic-row ${item.tone ?? "default"}`} key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+          </details>
         </>
       ) : (
         <>

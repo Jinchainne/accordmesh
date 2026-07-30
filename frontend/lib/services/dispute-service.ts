@@ -144,14 +144,6 @@ export async function loadWorkspaceSnapshot(): Promise<{
     );
   }
 
-  if (!warnings.length) {
-    return { disputes, platformConfig, warnings };
-  }
-
-  if (disputesResult.status === "rejected" && platformConfigResult.status === "rejected") {
-    throw new Error(warnings.join(" "));
-  }
-
   return { disputes, platformConfig, warnings };
 }
 
