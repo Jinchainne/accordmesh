@@ -34,7 +34,7 @@ export function WalletPanel({
   onRefresh,
 }: WalletPanelProps) {
   return (
-    <section className="panel">
+    <section className="panel wallet-panel">
       <div className="section-top compact">
         <div>
           <span className="eyebrow dark">Network access</span>
@@ -73,8 +73,10 @@ export function WalletPanel({
           Refresh cases
         </button>
       </div>
-      {message ? <p className="tiny-note">{message}</p> : null}
-      <div className="diagnostic-list">
+      <div className="wallet-panel-feedback">
+        {message ? <p className="tiny-note">{message}</p> : <p className="tiny-note wallet-feedback-placeholder" />}
+      </div>
+      <div className="diagnostic-list wallet-diagnostic-list">
         {diagnostics.map((item) => (
           <div className={`diagnostic-row ${item.tone ?? "default"}`} key={item.label}>
             <span>{item.label}</span>

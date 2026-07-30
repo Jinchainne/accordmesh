@@ -198,6 +198,7 @@ p {
 .sidebar {
   position: sticky;
   top: 20px;
+  overflow-anchor: none;
 }
 
 .sidebar-intro h2 {
@@ -704,10 +705,27 @@ p {
   font-size: 13px;
 }
 
+.wallet-panel {
+  overflow-anchor: none;
+}
+
+.wallet-panel-feedback {
+  min-height: 48px;
+}
+
+.wallet-feedback-placeholder {
+  visibility: hidden;
+}
+
 .diagnostic-list {
   display: grid;
   gap: 8px;
   margin-top: 14px;
+}
+
+.wallet-diagnostic-list {
+  min-height: 280px;
+  align-content: start;
 }
 
 .diagnostic-row {
