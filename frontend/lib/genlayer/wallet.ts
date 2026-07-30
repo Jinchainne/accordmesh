@@ -1,6 +1,8 @@
 export type EthereumProvider = {
   isMetaMask?: boolean;
   isRabby?: boolean;
+  isOkxWallet?: boolean;
+  isOKExWallet?: boolean;
   providers?: EthereumProvider[];
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
   on?(event: string, listener: (...args: unknown[]) => void): void;
@@ -10,6 +12,9 @@ export type EthereumProvider = {
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
+    okxwallet?: {
+      ethereum?: EthereumProvider;
+    };
   }
 }
 
@@ -29,6 +34,7 @@ export const ACCORDMESH_PROVIDER_EVENT = "accordmesh:providersChanged";
 
 const discoveredProviders = new Map<string, Eip6963ProviderDetail>();
 let discoveryInitialized = false;
+let requestProvidersTimeout: number | null = null;
 
 function getProviderKey(detail: Eip6963ProviderDetail) {
   return detail.info.rdns || detail.info.uuid || detail.info.name || "unknown";
@@ -38,6 +44,24 @@ function isMetaMaskDetail(detail: Eip6963ProviderDetail) {
   const rdns = detail.info.rdns?.toLowerCase() ?? "";
   const name = detail.info.name?.toLowerCase() ?? "";
   return rdns.includes("metamask") || name.includes("metamask");
+}
+
+function isOkxDetail(detail: Eip6963ProviderDetail) {
+  const rdns = detail.info.rdns?.toLowerCase() ?? "";
+  const name = detail.info.name?.toLowerCase() ?? "";
+  return rdns.includes("okx") || name.includes("okx");
+}
+
+function isOkxProvider(provider: EthereumProvider) {
+  return Boolean(provider.isOkxWallet || provider.isOKExWallet);
+}
+
+function requestEip6963Providers() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
 }
 
 function registerDiscoveredProvider(detail: Eip6963ProviderDetail) {
@@ -61,22 +85,36 @@ export function primeBrowserProviders() {
     }
   }) as EventListener);
 
-  window.dispatchEvent(new Event("eip6963:requestProvider"));
+  requestEip6963Providers();
+
+  // Some injected wallets announce after the app has already mounted in production,
+  // so we re-request once more shortly after load to catch late providers.
+  requestProvidersTimeout = window.setTimeout(() => {
+    requestEip6963Providers();
+  }, 1200);
+
+  window.addEventListener("focus", requestEip6963Providers);
 }
 
 function getAllProviders() {
   const injected = window.ethereum ?? null;
+  const okxInjected = window.okxwallet?.ethereum ?? null;
   const directProviders =
     injected && Array.isArray(injected.providers) && injected.providers.length
       ? injected.providers
       : injected
         ? [injected]
         : [];
+  const okxProviders = okxInjected ? [okxInjected] : [];
 
   const announcedProviders = Array.from(discoveredProviders.values()).map((detail) => detail.provider);
   const uniqueProviders = new Set<EthereumProvider>();
 
   for (const provider of directProviders) {
+    uniqueProviders.add(provider);
+  }
+
+  for (const provider of okxProviders) {
     uniqueProviders.add(provider);
   }
 
@@ -90,6 +128,10 @@ function getAllProviders() {
 function getProviderLabel(provider: EthereumProvider) {
   if (provider.isRabby) {
     return "Rabby";
+  }
+
+  if (isOkxProvider(provider)) {
+    return "OKX Wallet";
   }
 
   if (provider.isMetaMask) {
@@ -121,6 +163,8 @@ export function getBrowserProvider() {
 
   return (
     providers.find((provider) => provider.isMetaMask && !provider.isRabby) ??
+    Array.from(discoveredProviders.values()).find((detail) => isOkxDetail(detail))?.provider ??
+    providers.find((provider) => isOkxProvider(provider)) ??
     providers.find((provider) => provider.isMetaMask) ??
     providers[0] ??
     null
@@ -154,6 +198,11 @@ export function getDetectedWalletLabels() {
 
     if (rdns.includes("rabby")) {
       labels.add("Rabby");
+      continue;
+    }
+
+    if (rdns.includes("okx")) {
+      labels.add("OKX Wallet");
     }
   }
 

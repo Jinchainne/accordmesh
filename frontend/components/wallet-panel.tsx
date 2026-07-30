@@ -60,7 +60,7 @@ export function WalletPanel({
         </div>
         <div className="stage-card compact-card">
           <strong>Connected signer</strong>
-          <p className="mono">{isConnected ? address : "Connect MetaMask to sign transactions."}</p>
+          <p className="mono">{isConnected ? address : "Connect an EVM wallet to sign transactions."}</p>
           {chainId ? <p>Current chain id: {chainId}</p> : null}
           <p>Network: {networkName}</p>
         </div>

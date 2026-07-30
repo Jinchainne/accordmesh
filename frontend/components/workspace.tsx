@@ -58,13 +58,14 @@ export function Workspace() {
     Array<{ label: string; value: string; tone?: "default" | "ok" | "warn" | "danger" }>
   >([
     { label: "Provider", value: "Checking..." },
-    { label: "MetaMask", value: "Checking..." },
+    { label: "Wallet type", value: "Checking..." },
     { label: "Chain", value: "Checking..." },
     { label: "Studionet", value: "Checking..." },
   ]);
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [providerRevision, setProviderRevision] = useState(0);
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
   const hasConnectedWallet = walletAddress !== "";
@@ -110,7 +111,7 @@ export function Workspace() {
     if (!provider) {
       setWalletDiagnostics([
         { label: "Provider", value: "Not found", tone: "danger" },
-        { label: "MetaMask", value: "Unavailable", tone: "danger" },
+        { label: "Preferred wallet", value: "Unavailable", tone: "danger" },
         { label: "Chain", value: "Unavailable", tone: "danger" },
         { label: "Studionet", value: "Unknown", tone: "warn" },
       ]);
@@ -124,9 +125,15 @@ export function Workspace() {
     }> = [
       { label: "Provider", value: "Injected", tone: "ok" },
       {
-        label: "MetaMask",
-        value: provider.isMetaMask ? (provider.isRabby ? "Spoofed by Rabby" : "Yes") : "No",
-        tone: provider.isMetaMask ? (provider.isRabby ? "warn" : "ok") : "warn",
+        label: "Wallet type",
+        value: provider.isRabby
+          ? "Rabby"
+          : provider.isOkxWallet || provider.isOKExWallet
+            ? "OKX Wallet"
+            : provider.isMetaMask
+              ? "MetaMask"
+              : "Injected EVM wallet",
+        tone: provider.isRabby ? "warn" : "ok",
       },
       { label: "Chain", value: "Checking..." },
       { label: "Studionet", value: "Checking..." },
@@ -143,7 +150,7 @@ export function Workspace() {
       if (clientVersion?.toLowerCase().includes("rabby") || provider.isRabby) {
         nextDiagnostics.push({
           label: "Compatibility",
-          value: "Rabby can inject as MetaMask. MetaMask is recommended for the cleanest Studionet flow.",
+          value: "Rabby can inject as MetaMask. A dedicated MetaMask or OKX provider is more reliable for Studionet.",
           tone: "warn",
         });
       }
@@ -215,45 +222,51 @@ export function Workspace() {
     setWalletMessage(
       accounts[0]
         ? "Wallet connected and ready to sign GenLayer transactions."
-        : "Wallet detected. Connect MetaMask to sign transactions.",
+        : "Wallet detected. Connect your wallet to sign transactions.",
     );
     await inspectWallet();
   });
 
   useEffect(() => {
-    const provider = getBrowserProvider();
     void syncWalletState();
 
     const handleProviderInventoryChanged = () => {
+      setProviderRevision((current) => current + 1);
       void syncWalletState();
     };
 
     window.addEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
 
+    return () => {
+      window.removeEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
+    };
+  }, [syncWalletState]);
+
+  useEffect(() => {
+    const provider = getBrowserProvider();
     if (!provider) {
-      return () => {
-        window.removeEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
-      };
+      return;
     }
 
     const handleAccountsChanged = (accounts: unknown) => {
       const nextAccounts = Array.isArray(accounts) ? accounts.map(String) : [];
       setWalletAddress(nextAccounts[0] ?? "");
+      void syncWalletState();
     };
 
     const handleChainChanged = (nextChainId: unknown) => {
       setChainId(String(nextChainId ?? ""));
+      void syncWalletState();
     };
 
     provider.on?.("accountsChanged", handleAccountsChanged);
     provider.on?.("chainChanged", handleChainChanged);
 
     return () => {
-      window.removeEventListener(ACCORDMESH_PROVIDER_EVENT, handleProviderInventoryChanged);
       provider.removeListener?.("accountsChanged", handleAccountsChanged);
       provider.removeListener?.("chainChanged", handleChainChanged);
     };
-  }, [syncWalletState]);
+  }, [providerRevision, syncWalletState]);
 
   const ensureStudionet = useEffectEvent(async () => {
     const provider = getBrowserProvider();
@@ -292,7 +305,7 @@ export function Workspace() {
     const provider = getBrowserProvider();
     if (!provider) {
       setErrorMessage("No browser wallet detected.");
-      setWalletMessage("No injected browser wallet was found. Open the app in a browser with MetaMask.");
+      setWalletMessage("No injected browser wallet was found. Open the app in a browser with MetaMask, OKX Wallet, or another EVM wallet.");
       return;
     }
 
@@ -330,7 +343,7 @@ export function Workspace() {
   async function connectWallet() {
     const provider = getBrowserProvider();
     if (!provider) {
-      setWalletMessage("No injected browser wallet was found. Install MetaMask or reopen this page in your wallet browser.");
+      setWalletMessage("No injected browser wallet was found. Install MetaMask or OKX Wallet, or reopen this page in your wallet browser.");
       await inspectWallet();
       return;
     }

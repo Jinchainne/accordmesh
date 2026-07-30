@@ -40,7 +40,7 @@ function requireWalletAddress(address?: string) {
 function requireProvider() {
   const provider = getBrowserProvider();
   if (!provider) {
-    throw new Error("No browser wallet detected. Install MetaMask or another injected wallet.");
+    throw new Error("No browser wallet detected. Install MetaMask, OKX Wallet, or another injected EVM wallet.");
   }
 
   return provider;
