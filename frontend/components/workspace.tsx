@@ -5,9 +5,9 @@ import { appConfig } from "../lib/genlayer/config";
 import {
   ACCORDMESH_PROVIDER_EVENT,
   getBrowserProvider,
-  getBrowserProviders,
   getDetectedWalletLabels,
   rememberBrowserProvider,
+  waitForBrowserProviders,
 } from "../lib/genlayer/wallet";
 import { studionetChain } from "../lib/wallet/studionet-chain";
 import type {
@@ -53,7 +53,6 @@ function formatSyncWarning(message: string) {
 }
 
 export function Workspace() {
-  const [searchQuery, setSearchQuery] = useState("");
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({
     platformName: "AccordMesh",
@@ -79,23 +78,7 @@ export function Workspace() {
   const [providerRevision, setProviderRevision] = useState(0);
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
-  const filteredDisputes = disputes.filter((item) => {
-    const keyword = searchQuery.trim().toLowerCase();
-    if (!keyword) {
-      return true;
-    }
-
-    return [
-      item.title,
-      item.caseType,
-      item.claimantStatement,
-      item.respondent,
-      item.claimant,
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(keyword);
-  });
+  const filteredDisputes = disputes;
   const hasConnectedWallet = walletAddress !== "";
   const isStudionetReady = chainId.toLowerCase() === "0xf22f";
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
@@ -361,7 +344,7 @@ export function Workspace() {
   });
 
   async function connectWallet() {
-    const providers = getBrowserProviders();
+    const providers = await waitForBrowserProviders();
     if (!providers.length) {
       setWalletMessage("No injected browser wallet was found. Install MetaMask or OKX Wallet, or reopen this page in your wallet browser.");
       await inspectWallet();
@@ -375,6 +358,24 @@ export function Workspace() {
         rememberBrowserProvider(provider);
         setWalletMessage("Requesting wallet access...");
         const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+        const nextAddress = accounts[0] ?? "";
+
+        if (nextAddress) {
+          await prepareConnectedWallet(nextAddress);
+          return;
+        }
+      } catch (error) {
+        lastErrorMessage = error instanceof Error ? error.message : "Wallet access request failed.";
+      }
+    }
+
+    const fallbackProvider = getBrowserProvider();
+    if (fallbackProvider) {
+      try {
+        rememberBrowserProvider(fallbackProvider);
+        const accounts = (await fallbackProvider.request({
+          method: "eth_requestAccounts",
+        })) as string[];
         const nextAddress = accounts[0] ?? "";
 
         if (nextAddress) {
@@ -479,23 +480,7 @@ export function Workspace() {
             <span className="header-kicker">Workspace</span>
             <span className="masthead-brand masthead-brand-inline">AccordMesh</span>
           </div>
-          <form className="header-search" role="search" onSubmit={(event) => event.preventDefault()}>
-            <input
-              aria-label="Search case files"
-              placeholder="Search case title, claimant, respondent..."
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-            <button className="button" type="submit">
-              Search
-            </button>
-          </form>
           <div className="header-strip-right">
-            <div className="header-chip">
-              <span>Network</span>
-              <strong>{appConfig.networkName}</strong>
-            </div>
             <WalletPanel
               address={walletAddress}
               chainId={chainId}

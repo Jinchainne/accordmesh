@@ -121,7 +121,7 @@ p {
 
 .header-strip {
   display: grid;
-  grid-template-columns: auto minmax(260px, 1fr) auto;
+  grid-template-columns: auto 1fr;
   gap: 12px;
   align-items: center;
   min-height: 48px;
@@ -160,31 +160,6 @@ p {
   font-size: 1.05rem;
 }
 
-.header-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0;
-  align-items: center;
-}
-
-.header-search input {
-  width: 100%;
-  min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid rgba(18, 48, 68, 0.16);
-  border-right: 0;
-  border-radius: 8px 0 0 8px;
-  background: #fff;
-  color: var(--ink);
-  font: inherit;
-}
-
-.header-search .button {
-  min-height: 38px;
-  border-radius: 0 8px 8px 0;
-  padding: 0 14px;
-}
-
 .wallet-panel-compact {
   width: auto;
   min-width: 0;
@@ -192,10 +167,6 @@ p {
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.wallet-compact-bar {
-  gap: 6px;
 }
 
 .wallet-panel-compact .eyebrow,
@@ -207,9 +178,33 @@ p {
 }
 
 .wallet-compact-main {
+  display: flex;
   margin-top: 0;
   gap: 8px;
   align-items: center;
+  flex-wrap: nowrap;
+}
+
+.wallet-compact-network {
+  display: grid;
+  min-width: 86px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(247, 243, 236, 0.88);
+}
+
+.wallet-compact-network span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.wallet-compact-network strong {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink);
 }
 
 .wallet-compact-summary strong {
@@ -221,20 +216,12 @@ p {
 
 .wallet-panel-actions {
   gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .wallet-panel-compact .button {
   min-height: 34px;
   padding: 0 12px;
-}
-
-.header-chip {
-  min-width: 0;
-  padding: 7px 11px;
-}
-
-.header-chip strong {
-  margin-top: 2px;
 }
 
 .header-spacer {
@@ -258,27 +245,6 @@ p {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-.header-chip {
-  min-width: 106px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 7px 12px;
-  background: rgba(247, 243, 236, 0.88);
-}
-
-.header-chip span {
-  display: block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.header-chip strong {
-  display: block;
-  margin-top: 4px;
 }
 
 .grid {
@@ -985,17 +951,6 @@ p {
   .header-strip-left,
   .header-strip-right {
     flex-wrap: wrap;
-  }
-
-  .header-search {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .header-search input,
-  .header-search .button {
-    border-radius: 10px;
-    border-right: 1px solid rgba(18, 48, 68, 0.16);
   }
 
   .wallet-compact-main {

@@ -65,6 +65,10 @@ function requestEip6963Providers() {
   window.dispatchEvent(new Event("eip6963:requestProvider"));
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function registerDiscoveredProvider(detail: Eip6963ProviderDetail) {
   discoveredProviders.set(getProviderKey(detail), detail);
   if (typeof window !== "undefined") {
@@ -217,6 +221,29 @@ export function getBrowserProviders() {
 
   preferredProvider = rankedProviders[0] ?? null;
   return rankedProviders;
+}
+
+export async function waitForBrowserProviders(retries = 3, delayMs = 350) {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  primeBrowserProviders();
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const providers = getBrowserProviders();
+    if (providers.length) {
+      return providers;
+    }
+
+    requestEip6963Providers();
+
+    if (attempt < retries) {
+      await sleep(delayMs);
+    }
+  }
+
+  return getBrowserProviders();
 }
 
 export function rememberBrowserProvider(provider: EthereumProvider) {

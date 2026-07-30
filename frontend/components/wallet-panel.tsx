@@ -38,27 +38,20 @@ export function WalletPanel({
   const isCompact = variant === "compact";
   const compactDiagnostics = diagnostics.slice(0, 4);
   const shortAddress = isConnected ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
-  const compactStatus = isReady ? "Studionet ready" : isConnected ? "Needs switch" : "Pending";
+  const compactStatus = isReady ? "Ready" : isConnected ? "Switch network" : "Connect";
 
   return (
     <section className={`wallet-panel ${isCompact ? "wallet-panel-compact" : "panel"}`}>
       {isCompact ? (
         <>
-          <div className="wallet-compact-bar">
-            <span className="eyebrow solid">Wallet access</span>
-            <div className="wallet-compact-badges">
-              <span className={`badge ${isReady ? "" : isConnected ? "warn" : "warn"}`}>
-                {compactStatus}
-              </span>
-              <span className={`badge ${hasWallet ? "" : "danger"}`}>
-                {hasWallet ? "Detected" : "Missing"}
-              </span>
-            </div>
-          </div>
           <div className="wallet-compact-main">
+            <div className="wallet-compact-network">
+              <span>Network</span>
+              <strong>{networkName}</strong>
+            </div>
             <div className="wallet-compact-summary">
-              <strong>{isConnected ? shortAddress : "Connect wallet"}</strong>
-              <span>{chainId ? `Chain ${chainId}` : "Chain unavailable"} · {networkName}</span>
+              <strong>{isConnected ? shortAddress : "Wallet"}</strong>
+              <span>{hasWallet ? compactStatus : "No wallet detected"}</span>
             </div>
             <div className="actions-row wallet-panel-actions">
               <button className="button" type="button" onClick={onConnect} disabled={isBusy || !canConnect}>
