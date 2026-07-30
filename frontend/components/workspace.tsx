@@ -50,6 +50,10 @@ function formatSyncWarning(message: string) {
     return "";
   }
 
+  if (message.toLowerCase().includes("failed to fetch")) {
+    return "";
+  }
+
   return "Live sync is temporarily unavailable. You can still connect wallet and prepare case data.";
 }
 
@@ -316,17 +320,14 @@ export function Workspace() {
     try {
       setErrorMessage("");
       await inspectWallet();
-      setWalletMessage("Wallet connected. Preparing Studionet network...");
-
-      await ensureStudionet();
 
       const updatedChainId = (await provider.request({ method: "eth_chainId" })) as string;
       setChainId(updatedChainId ?? "");
       setWalletAddress(address);
       setWalletMessage(
-        `Connected as ${address}. Studionet access is ready${
-          updatedChainId ? ` on chain ${updatedChainId}` : ""
-        }.`,
+        updatedChainId === "0xf22f"
+          ? `Connected as ${address}. Studionet is ready.`
+          : `Connected as ${address}. Switch to Studionet to continue.`,
       );
       await inspectWallet();
     } catch (error) {
