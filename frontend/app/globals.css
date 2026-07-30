@@ -196,8 +196,7 @@ p {
 }
 
 .sidebar {
-  position: sticky;
-  top: 20px;
+  position: static;
   overflow-anchor: none;
 }
 
@@ -242,7 +241,7 @@ p {
   box-shadow: var(--shadow);
   border-radius: 28px;
   padding: 24px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
 }
 
 .overview-grid {

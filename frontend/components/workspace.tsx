@@ -7,7 +7,6 @@ import {
   getBrowserProvider,
   getBrowserProviders,
   getDetectedWalletLabels,
-  hasDedicatedMetaMaskProvider,
   rememberBrowserProvider,
 } from "../lib/genlayer/wallet";
 import { studionetChain } from "../lib/wallet/studionet-chain";
@@ -135,7 +134,7 @@ export function Workspace() {
             : provider.isMetaMask
               ? "MetaMask"
               : "Injected EVM wallet",
-        tone: provider.isRabby ? "warn" : "ok",
+        tone: "ok",
       },
       { label: "Chain", value: "Checking..." },
       { label: "Studionet", value: "Checking..." },
@@ -152,7 +151,7 @@ export function Workspace() {
       if (clientVersion?.toLowerCase().includes("rabby") || provider.isRabby) {
         nextDiagnostics.push({
           label: "Compatibility",
-          value: "Rabby can inject as MetaMask. A dedicated MetaMask or OKX provider is more reliable for Studionet.",
+          value: "Rabby detected. Use Switch to Studionet to move this wallet to chain 0xf22f.",
           tone: "warn",
         });
       }
@@ -169,15 +168,7 @@ export function Workspace() {
       nextDiagnostics.push({
         label: "Detected wallets",
         value: detectedWallets.join(", "),
-        tone: detectedWallets.some((item) => item.toLowerCase().includes("metamask")) ? "ok" : "warn",
-      });
-    }
-
-    if (provider.isRabby && !hasDedicatedMetaMaskProvider()) {
-      nextDiagnostics.push({
-        label: "Recommendation",
-        value: "Only Rabby is active for this site. Disable Rabby here or open a MetaMask-only browser profile.",
-        tone: "warn",
+        tone: "ok",
       });
     }
 

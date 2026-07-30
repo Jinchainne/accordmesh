@@ -5,6 +5,9 @@
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
     "lint": "npm --prefix frontend run lint"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "genlayer-js": "^1.1.8"
   }
 }
-
