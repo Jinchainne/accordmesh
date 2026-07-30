@@ -52,6 +52,7 @@ const discoveredProviders = new Map<string, Eip6963ProviderDetail>();
 let discoveryInitialized = false;
 let requestProvidersTimeout: number | null = null;
 let preferredProvider: EthereumProvider | null = null;
+let activeProvider: EthereumProvider | null = null;
 
 function getProviderKey(detail: Eip6963ProviderDetail) {
   return detail.info.rdns || detail.info.uuid || detail.info.name || "unknown";
@@ -193,7 +194,13 @@ function getProviderScore(provider: EthereumProvider) {
 function pickPreferredProvider(providers: EthereumProvider[]) {
   if (!providers.length) {
     preferredProvider = null;
+    activeProvider = null;
     return null;
+  }
+
+  if (activeProvider && providers.includes(activeProvider)) {
+    preferredProvider = activeProvider;
+    return activeProvider;
   }
 
   if (preferredProvider && providers.includes(preferredProvider)) {
@@ -268,6 +275,26 @@ export async function waitForBrowserProviders(retries = 3, delayMs = 350) {
 
 export function rememberBrowserProvider(provider: EthereumProvider) {
   preferredProvider = provider;
+}
+
+export function setActiveBrowserProvider(provider: EthereumProvider | null) {
+  activeProvider = provider;
+  preferredProvider = provider;
+}
+
+export function getActiveBrowserProvider() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (activeProvider) {
+    const providers = getAllProviders();
+    if (providers.includes(activeProvider)) {
+      return activeProvider;
+    }
+  }
+
+  return getBrowserProvider();
 }
 
 export function getDetectedWalletLabels() {

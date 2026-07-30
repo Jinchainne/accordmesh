@@ -2,7 +2,7 @@ import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 import type { Hash } from "genlayer-js/types";
 import { appConfig } from "../genlayer/config";
 import { createReadClient, createWriteClient } from "../genlayer/client";
-import { getBrowserProvider } from "../genlayer/wallet";
+import { getActiveBrowserProvider } from "../genlayer/wallet";
 import type {
   AppealReviewInput,
   AppealInput,
@@ -38,7 +38,7 @@ function requireWalletAddress(address?: string) {
 }
 
 function requireProvider() {
-  const provider = getBrowserProvider();
+  const provider = getActiveBrowserProvider();
   if (!provider) {
     throw new Error("No browser wallet detected. Install MetaMask, OKX Wallet, or another injected EVM wallet.");
   }

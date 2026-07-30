@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { appConfig } from "../lib/genlayer/config";
 import {
   ACCORDMESH_PROVIDER_EVENT,
+  getActiveBrowserProvider,
   getBrowserProvider,
   getBrowserProviders,
   getDetectedWalletLabels,
@@ -14,6 +15,7 @@ import {
   hasDedicatedMetaMaskProvider,
   hasOkxProvider,
   rememberBrowserProvider,
+  setActiveBrowserProvider,
   waitForBrowserProviders,
 } from "../lib/genlayer/wallet";
 import { studionetChain } from "../lib/wallet/studionet-chain";
@@ -129,7 +131,7 @@ export function Workspace() {
   }, [refreshData]);
 
   const inspectWallet = useEffectEvent(async () => {
-    const provider = getBrowserProvider();
+    const provider = getActiveBrowserProvider();
     if (!provider) {
       setWalletDiagnostics([
         { label: "Provider", value: "Not found", tone: "danger" },
@@ -222,7 +224,7 @@ export function Workspace() {
   });
 
   const syncWalletState = useEffectEvent(async () => {
-    const provider = getBrowserProvider();
+    const provider = getActiveBrowserProvider();
     if (!provider) {
       setWalletMessage("No injected browser wallet was found in this browser.");
       await inspectWallet();
@@ -257,7 +259,7 @@ export function Workspace() {
   }, [syncWalletState]);
 
   useEffect(() => {
-    const provider = getBrowserProvider();
+    const provider = getActiveBrowserProvider();
     if (!provider) {
       return;
     }
@@ -283,7 +285,7 @@ export function Workspace() {
   }, [providerRevision, syncWalletState]);
 
   const ensureStudionet = useEffectEvent(async (providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>) => {
-    const provider = providerOverride ?? getBrowserProvider();
+    const provider = providerOverride ?? getActiveBrowserProvider();
     if (!provider) {
       throw new Error("No browser wallet detected.");
     }
@@ -320,7 +322,7 @@ export function Workspace() {
       address: string,
       providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>,
     ) => {
-    const provider = providerOverride ?? getBrowserProvider();
+    const provider = providerOverride ?? getActiveBrowserProvider();
     if (!provider) {
       setErrorMessage("No browser wallet detected.");
       setWalletMessage("No injected browser wallet was found. Open the app in a browser with MetaMask, OKX Wallet, or another EVM wallet.");
@@ -372,6 +374,7 @@ export function Workspace() {
     for (const provider of providers) {
       try {
         rememberBrowserProvider(provider);
+        setActiveBrowserProvider(provider);
         setWalletMessage("Requesting wallet access...");
         const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
         const nextAddress = accounts[0] ?? "";
@@ -389,6 +392,7 @@ export function Workspace() {
     if (fallbackProvider) {
       try {
         rememberBrowserProvider(fallbackProvider);
+        setActiveBrowserProvider(fallbackProvider);
         const accounts = (await fallbackProvider.request({
           method: "eth_requestAccounts",
         })) as string[];
@@ -431,6 +435,7 @@ export function Workspace() {
 
     try {
       rememberBrowserProvider(provider);
+      setActiveBrowserProvider(provider);
       setWalletMessage(`Requesting ${kind === "metamask" ? "MetaMask" : "OKX Wallet"} access...`);
       const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
       const nextAddress = accounts[0] ?? "";
@@ -463,7 +468,7 @@ export function Workspace() {
 
     try {
       setWalletMessage("Switching wallet to Studionet...");
-      await ensureStudionet(getBrowserProvider() ?? undefined);
+      await ensureStudionet(getActiveBrowserProvider() ?? undefined);
       await syncWalletState();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to switch wallet network.";
@@ -578,7 +583,7 @@ export function Workspace() {
               <WalletPanel
                 address={walletAddress}
                 chainId={chainId}
-                hasWallet={Boolean(getBrowserProvider())}
+                hasWallet={Boolean(getActiveBrowserProvider())}
                 hasMetaMask={hasDedicatedMetaMaskProvider()}
                 hasOkx={hasOkxProvider()}
                 isConnected={hasConnectedWallet}
