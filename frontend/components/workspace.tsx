@@ -49,14 +49,7 @@ function formatSyncWarning(message: string) {
     return "";
   }
 
-  const normalized = message
-    .replaceAll("An unknown RPC error occurred. Details: Failed to fetch Version: viem@2.55.10", "RPC unavailable")
-    .replaceAll("Case board sync failed:", "Case board offline:")
-    .replaceAll("Platform config sync failed:", "Platform config offline:")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return normalized;
+  return "Live sync is temporarily unavailable. You can still connect wallet and prepare case data.";
 }
 
 export function Workspace() {
@@ -476,7 +469,6 @@ export function Workspace() {
             <div>
               <span className="eyebrow solid">AccordMesh</span>
               <h1>Dispute operations desk</h1>
-              <p>Live case intake, evidence handling, mediation, appeals, and operator review.</p>
             </div>
           </div>
           <div className="header-wallet">

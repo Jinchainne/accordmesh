@@ -38,40 +38,38 @@ export function WalletPanel({
   const isCompact = variant === "compact";
   const compactDiagnostics = diagnostics.slice(0, 4);
   const shortAddress = isConnected ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
+  const compactStatus = isReady ? "Studionet ready" : isConnected ? "Needs switch" : "Pending";
 
   return (
     <section className={`wallet-panel ${isCompact ? "wallet-panel-compact" : "panel"}`}>
       {isCompact ? (
         <>
-          <div className="wallet-compact-head">
-            <div>
-              <span className="eyebrow solid">Wallet access</span>
-              <h2>{isConnected ? "Signer ready" : "Connect wallet"}</h2>
-            </div>
+          <div className="wallet-compact-bar">
+            <span className="eyebrow solid">Wallet access</span>
             <div className="wallet-compact-badges">
               <span className={`badge ${isReady ? "" : isConnected ? "warn" : "warn"}`}>
-                {isReady ? "Studionet ready" : isConnected ? "Needs switch" : "Pending"}
+                {compactStatus}
               </span>
               <span className={`badge ${hasWallet ? "" : "danger"}`}>
                 {hasWallet ? "Detected" : "Missing"}
               </span>
             </div>
           </div>
-          <div className="wallet-compact-address">
-            <strong>{isConnected ? shortAddress : "Connect an EVM wallet to sign transactions."}</strong>
-            <span>
-              {chainId ? `Chain ${chainId}` : "Chain unavailable"} · {networkName}
-            </span>
+          <div className="wallet-compact-main">
+            <div className="wallet-compact-summary">
+              <strong>{isConnected ? shortAddress : "Connect wallet"}</strong>
+              <span>{chainId ? `Chain ${chainId}` : "Chain unavailable"} · {networkName}</span>
+            </div>
+            <div className="actions-row wallet-panel-actions">
+              <button className="button" type="button" onClick={onConnect} disabled={isBusy || !canConnect}>
+                {connectLabel}
+              </button>
+              <button className="button secondary" type="button" onClick={onRefresh} disabled={isBusy}>
+                Refresh cases
+              </button>
+            </div>
           </div>
-          <div className="actions-row wallet-panel-actions">
-            <button className="button" type="button" onClick={onConnect} disabled={isBusy || !canConnect}>
-              {connectLabel}
-            </button>
-            <button className="button secondary" type="button" onClick={onRefresh} disabled={isBusy}>
-              Refresh cases
-            </button>
-          </div>
-          <div className="wallet-panel-feedback">
+          <div className="wallet-panel-feedback wallet-panel-feedback-compact">
             {message ? <p className="tiny-note">{message}</p> : <p className="tiny-note wallet-feedback-placeholder" />}
           </div>
           <details className="wallet-compact-details">
