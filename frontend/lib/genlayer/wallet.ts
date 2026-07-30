@@ -126,6 +126,10 @@ function getAllProviders() {
   return Array.from(uniqueProviders);
 }
 
+function getRankedProviders(providers: EthereumProvider[]) {
+  return [...providers].sort((left, right) => getProviderScore(right) - getProviderScore(left));
+}
+
 function getProviderLabel(provider: EthereumProvider) {
   if (provider.isRabby) {
     return "Rabby";
@@ -172,7 +176,7 @@ function pickPreferredProvider(providers: EthereumProvider[]) {
     return preferredProvider;
   }
 
-  const rankedProviders = [...providers].sort((left, right) => getProviderScore(right) - getProviderScore(left));
+  const rankedProviders = getRankedProviders(providers);
   preferredProvider = rankedProviders[0] ?? null;
   return preferredProvider;
 }
@@ -191,6 +195,32 @@ export function getBrowserProvider() {
   }
 
   return pickPreferredProvider(providers);
+}
+
+export function getBrowserProviders() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  primeBrowserProviders();
+
+  const providers = getAllProviders();
+  if (!providers.length) {
+    preferredProvider = null;
+    return [];
+  }
+
+  const rankedProviders = getRankedProviders(providers);
+  if (preferredProvider && rankedProviders.includes(preferredProvider)) {
+    return [preferredProvider, ...rankedProviders.filter((provider) => provider !== preferredProvider)];
+  }
+
+  preferredProvider = rankedProviders[0] ?? null;
+  return rankedProviders;
+}
+
+export function rememberBrowserProvider(provider: EthereumProvider) {
+  preferredProvider = provider;
 }
 
 export function getDetectedWalletLabels() {

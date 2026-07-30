@@ -5,8 +5,10 @@ import { appConfig } from "../lib/genlayer/config";
 import {
   ACCORDMESH_PROVIDER_EVENT,
   getBrowserProvider,
+  getBrowserProviders,
   getDetectedWalletLabels,
   hasDedicatedMetaMaskProvider,
+  rememberBrowserProvider,
 } from "../lib/genlayer/wallet";
 import { studionetChain } from "../lib/wallet/studionet-chain";
 import type {
@@ -341,37 +343,40 @@ export function Workspace() {
   });
 
   async function connectWallet() {
-    const provider = getBrowserProvider();
-    if (!provider) {
+    const providers = getBrowserProviders();
+    if (!providers.length) {
       setWalletMessage("No injected browser wallet was found. Install MetaMask or OKX Wallet, or reopen this page in your wallet browser.");
       await inspectWallet();
       return;
     }
 
-    try {
-      setWalletMessage("Requesting wallet access...");
-      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-      const nextAddress = accounts[0] ?? "";
+    let lastErrorMessage = "Wallet detected, but no account was returned.";
 
-      if (nextAddress) {
-        await prepareConnectedWallet(nextAddress);
-        return;
+    for (const provider of providers) {
+      try {
+        rememberBrowserProvider(provider);
+        setWalletMessage("Requesting wallet access...");
+        const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+        const nextAddress = accounts[0] ?? "";
+
+        if (nextAddress) {
+          await prepareConnectedWallet(nextAddress);
+          return;
+        }
+      } catch (error) {
+        lastErrorMessage = error instanceof Error ? error.message : "Wallet access request failed.";
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Wallet access request failed.";
-      setWalletMessage(message);
-      setWalletDiagnostics((current) => [
-        ...current.filter((item) => item.label !== "Connect step"),
-        {
-          label: "Connect step",
-          value: message,
-          tone: "danger",
-        },
-      ]);
-      return;
     }
 
-    setWalletMessage("Wallet detected, but no account was returned.");
+    setWalletMessage(lastErrorMessage);
+    setWalletDiagnostics((current) => [
+      ...current.filter((item) => item.label !== "Connect step"),
+      {
+        label: "Connect step",
+        value: lastErrorMessage,
+        tone: "danger",
+      },
+    ]);
   }
 
   async function runMutation(label: string, task: () => Promise<string>) {
