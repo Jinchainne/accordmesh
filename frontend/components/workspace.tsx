@@ -7,6 +7,8 @@ import {
   getBrowserProvider,
   getBrowserProviders,
   getDetectedWalletLabels,
+  getInjectedEthereum,
+  getInjectedOkxEthereum,
   getMetaMaskProvider,
   getOkxProvider,
   hasDedicatedMetaMaskProvider,
@@ -280,8 +282,8 @@ export function Workspace() {
     };
   }, [providerRevision, syncWalletState]);
 
-  const ensureStudionet = useEffectEvent(async () => {
-    const provider = getBrowserProvider();
+  const ensureStudionet = useEffectEvent(async (providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>) => {
+    const provider = providerOverride ?? getBrowserProvider();
     if (!provider) {
       throw new Error("No browser wallet detected.");
     }
@@ -313,8 +315,12 @@ export function Workspace() {
     }
   });
 
-  const prepareConnectedWallet = useEffectEvent(async (address: string) => {
-    const provider = getBrowserProvider();
+  const prepareConnectedWallet = useEffectEvent(
+    async (
+      address: string,
+      providerOverride?: NonNullable<ReturnType<typeof getBrowserProvider>>,
+    ) => {
+    const provider = providerOverride ?? getBrowserProvider();
     if (!provider) {
       setErrorMessage("No browser wallet detected.");
       setWalletMessage("No injected browser wallet was found. Open the app in a browser with MetaMask, OKX Wallet, or another EVM wallet.");
@@ -350,7 +356,8 @@ export function Workspace() {
   });
 
   async function connectWallet() {
-    const immediateProviders = getBrowserProviders();
+    const injectedProvider = getInjectedEthereum();
+    const immediateProviders = injectedProvider ? [injectedProvider] : getBrowserProviders();
     const providers = immediateProviders.length
       ? immediateProviders
       : await waitForBrowserProviders(1, 150);
@@ -370,7 +377,7 @@ export function Workspace() {
         const nextAddress = accounts[0] ?? "";
 
         if (nextAddress) {
-          await prepareConnectedWallet(nextAddress);
+          await prepareConnectedWallet(nextAddress, provider);
           return;
         }
       } catch (error) {
@@ -388,7 +395,7 @@ export function Workspace() {
         const nextAddress = accounts[0] ?? "";
 
         if (nextAddress) {
-          await prepareConnectedWallet(nextAddress);
+          await prepareConnectedWallet(nextAddress, fallbackProvider);
           return;
         }
       } catch (error) {
@@ -408,7 +415,10 @@ export function Workspace() {
   }
 
   async function connectNamedWallet(kind: "metamask" | "okx") {
-    const provider = kind === "metamask" ? getMetaMaskProvider() : getOkxProvider();
+    const provider =
+      kind === "metamask"
+        ? getInjectedEthereum() ?? getMetaMaskProvider()
+        : getInjectedOkxEthereum() ?? getOkxProvider();
     if (!provider) {
       setWalletMessage(
         kind === "metamask"
@@ -429,7 +439,7 @@ export function Workspace() {
         throw new Error("Wallet detected, but no account was returned.");
       }
 
-      await prepareConnectedWallet(nextAddress);
+      await prepareConnectedWallet(nextAddress, provider);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet access request failed.";
       setErrorMessage(message);
@@ -453,7 +463,7 @@ export function Workspace() {
 
     try {
       setWalletMessage("Switching wallet to Studionet...");
-      await ensureStudionet();
+      await ensureStudionet(getBrowserProvider() ?? undefined);
       await syncWalletState();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to switch wallet network.";
@@ -520,223 +530,222 @@ export function Workspace() {
   }
 
   return (
-    <main className="shell shell-app">
-      <header className="app-header">
-        <div className="header-strip">
-          <div className="header-strip-left">
-            <span className="header-kicker">Workspace</span>
-            <span className="masthead-brand masthead-brand-inline">AccordMesh</span>
+    <main className="shell shell-dashboard">
+      <div className="dashboard-frame">
+        <aside className="app-sidebar">
+          <div className="sidebar-brand">
+            <div className="sidebar-brand-mark">A</div>
+            <div>
+              <strong>AccordMesh</strong>
+              <span>GenLayer native</span>
+            </div>
           </div>
-          <div className="header-strip-right">
-            <WalletPanel
-              address={walletAddress}
-              chainId={chainId}
-              hasWallet={Boolean(getBrowserProvider())}
-              hasMetaMask={hasDedicatedMetaMaskProvider()}
-              hasOkx={hasOkxProvider()}
-              isConnected={hasConnectedWallet}
-              isReady={isStudionetReady}
-              isBusy={isPending}
-              networkName={appConfig.networkName}
-              rpcUrl={appConfig.rpcUrl}
-              message={walletMessage}
-              canConnect={true}
-              connectLabel={
-                hasConnectedWallet
-                  ? isStudionetReady
-                    ? "Refresh wallet"
-                    : "Switch to Studionet"
-                  : "Connect wallet"
-              }
-              diagnostics={walletDiagnostics}
-              variant="compact"
-              onConnect={handleWalletAction}
-              onConnectMetaMask={() => {
-                void connectNamedWallet("metamask");
-              }}
-              onConnectOkx={() => {
-                void connectNamedWallet("okx");
-              }}
-              onRefresh={() => {
-                startTransition(async () => {
-                  await refreshData();
-                });
-              }}
-            />
-          </div>
-        </div>
-      </header>
 
-      <div className="header-spacer" aria-hidden="true" />
-
-      {warningMessage ? (
-        <section className="warning-banner" role="status" aria-live="polite">
-          <strong>Live sync notice</strong>
-          <span>{warningMessage}</span>
-        </section>
-      ) : null}
-
-      {errorMessage ? (
-        <section className="panel error-panel">
-          <h2>Action error</h2>
-          <p>{errorMessage}</p>
-        </section>
-      ) : null}
-
-      <TransactionStatusPanel transaction={transaction} />
-
-      <section className="workspace-layout">
-        <aside className="sidebar">
-          <nav className="panel section-nav" aria-label="Workspace sections">
-            <a href="#overview">Dashboard</a>
-            <a href="#board">Queue</a>
-            <a href="#intake">New dispute</a>
-            <a href="#detail">Case detail</a>
+          <nav className="sidebar-nav" aria-label="Workspace sections">
+            <a className="is-active" href="#overview">
+              Dashboard
+            </a>
+            <a href="#board">My cases</a>
+            <a href="#intake">Analysis</a>
+            <a href="#detail">Resolutions</a>
           </nav>
 
-          <section className="panel sidebar-actions-panel">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Actions</span>
-                <h2>Quick actions</h2>
-              </div>
+          <div className="sidebar-cta">
+            <a className="button sidebar-primary-button" href="#intake">
+              New dispute
+            </a>
+          </div>
+
+          <div className="sidebar-meta-links">
+            <a href="#detail">Documentation</a>
+            <a href="#board">Support</a>
+          </div>
+        </aside>
+
+        <section className="dashboard-main">
+          <header className="topbar">
+            <div className="topbar-search">
+              <span className="topbar-search-icon">o</span>
+              <input aria-label="Search cases" placeholder="Search cases..." type="text" />
             </div>
-            <div className="sidebar-actions">
-              <button
-                className="button secondary sidebar-action-button"
-                type="button"
-                onClick={() => {
+            <div className="topbar-actions">
+              <button className="topbar-icon" type="button" aria-label="Notifications">
+                o
+              </button>
+              <button className="topbar-icon" type="button" aria-label="Settings">
+                +
+              </button>
+              <WalletPanel
+                address={walletAddress}
+                chainId={chainId}
+                hasWallet={Boolean(getBrowserProvider())}
+                hasMetaMask={hasDedicatedMetaMaskProvider()}
+                hasOkx={hasOkxProvider()}
+                isConnected={hasConnectedWallet}
+                isReady={isStudionetReady}
+                isBusy={isPending}
+                networkName={appConfig.networkName}
+                rpcUrl={appConfig.rpcUrl}
+                message={walletMessage}
+                canConnect={true}
+                connectLabel={
+                  hasConnectedWallet
+                    ? isStudionetReady
+                      ? "Connected"
+                      : "Switch network"
+                    : "Connect Wallet"
+                }
+                diagnostics={walletDiagnostics}
+                variant="compact"
+                onConnect={handleWalletAction}
+                onConnectMetaMask={() => {
+                  void connectNamedWallet("metamask");
+                }}
+                onConnectOkx={() => {
+                  void connectNamedWallet("okx");
+                }}
+                onRefresh={() => {
                   startTransition(async () => {
                     await refreshData();
                   });
                 }}
-                disabled={isPending}
-              >
-                Refresh cases
-              </button>
-              <a className="button sidebar-action-button" href="#intake">
-                New file
-              </a>
-            </div>
-          </section>
-
-          <section className="panel sidebar-intro">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Desk</span>
-                <h2>Dispute workflow</h2>
+              />
+              <div className="topbar-avatar" aria-hidden="true">
+                {walletAddress ? walletAddress.slice(2, 4).toUpperCase() : "GM"}
               </div>
             </div>
-            <p>Review matters, open disputes, and continue into the full record.</p>
-          </section>
+          </header>
 
-          <CaseList
-            disputes={filteredDisputes}
-            selectedCaseId={selectedDispute?.id ?? ""}
-            onSelect={setSelectedCaseId}
-          />
-        </aside>
+          {warningMessage ? (
+            <section className="warning-banner" role="status" aria-live="polite">
+              <strong>Live sync notice</strong>
+              <span>{warningMessage}</span>
+            </section>
+          ) : null}
 
-        <div className="content-stack">
-          <section className="panel overview-panel" id="overview">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Dashboard</span>
-                <h2>{selectedDispute?.title ?? "Dispute desk"}</h2>
-              </div>
-              <p>{selectedDispute ? selectedDispute.caseType : "Live arbitration workspace"}</p>
-            </div>
+          {errorMessage ? (
+            <section className="panel error-panel">
+              <h2>Action error</h2>
+              <p>{errorMessage}</p>
+            </section>
+          ) : null}
 
-            <div className="metric-band compact-band">
-              <div className="metric-card dense">
-                <span>Open files</span>
-                <strong>{filteredDisputes.length}</strong>
-                <p>Loaded in this workspace.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>In review</span>
-                <strong>{reviewCount}</strong>
-                <p>Ready for review.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Appeals</span>
-                <strong>{appealCount}</strong>
-                <p>Escalations on record.</p>
-              </div>
-              <div className="metric-card dense">
-                <span>Ready</span>
-                <strong>{resolvedCount}</strong>
-                <p>Ready for handoff.</p>
-              </div>
-            </div>
+          <TransactionStatusPanel transaction={transaction} />
 
-            <div className="summary-actions">
-              <a className="button" href="#detail">
-                Open selected file
-              </a>
-              <a className="button secondary" href="#intake">
-                Start intake
-              </a>
-            </div>
-          </section>
+          <div className="dashboard-content">
+            <section className="system-overview panel-soft" id="overview">
+              <div className="system-overview-head">
+                <div>
+                  <h1>System Overview</h1>
+                  <p>Welcome back. Here is the current status of GenLayer dispute cases.</p>
+                </div>
+                <a className="button dashboard-cta-button" href="#intake">
+                  New Dispute
+                </a>
+              </div>
 
-          <section className="panel board-panel" id="board">
-            <div className="section-top compact">
-              <div>
-                <span className="eyebrow dark">Queue</span>
-                <h2>Case board</h2>
+              <div className="stats-grid">
+                <article className="stat-card">
+                  <span>Total cases</span>
+                  <strong>{filteredDisputes.length}</strong>
+                  <p>{selectedDispute ? "Live workspace loaded." : "Ready for intake and review."}</p>
+                </article>
+                <article className="stat-card">
+                  <span>Active mediations</span>
+                  <strong>{reviewCount}</strong>
+                  <p>{reviewCount ? `${reviewCount} matters need immediate action.` : "No matters are waiting on mediation."}</p>
+                </article>
+                <article className="stat-card">
+                  <span>Pending decisions</span>
+                  <strong>{appealCount}</strong>
+                  <p>{appealCount ? "Appeals are waiting on review." : "No decision queue is currently open."}</p>
+                </article>
               </div>
-              <p>What still needs action.</p>
-            </div>
-            <div className="queue-grid">
-              <div className="queue-card">
-                <span>Waiting response</span>
-                <strong>{intakeCount}</strong>
-                <p>Awaiting respondent participation.</p>
-              </div>
-              <div className="queue-card">
-                <span>In review</span>
-                <strong>{reviewCount}</strong>
-                <p>Ready for analysis or mediation.</p>
-              </div>
-              <div className="queue-card">
-                <span>Operator</span>
-                <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
-                <p>Bound to this deployment.</p>
-              </div>
-              <div className="queue-card">
-                <span>Selected</span>
-                <strong>{selectedDispute ? "Loaded" : "None"}</strong>
-                <p>
-                  {selectedDispute
-                    ? `${selectedDispute.caseType} file open below.`
-                    : "Choose a case from the left rail."}
-                </p>
-              </div>
-            </div>
-          </section>
 
-          <div id="intake">
-            <DisputeWizard disabled={isPending} onCreate={createCase} />
+              <section className="insight-banner">
+                <div className="insight-icon">AI</div>
+                <div>
+                  <strong>AI Analysis: Performance Summary</strong>
+                  <p>
+                    {resolvedCount
+                      ? `${resolvedCount} matters are already resolution-ready.`
+                      : "Mediation and intake metrics will appear here once live case traffic is loaded."}
+                    {" "}
+                    Wallet-based signing stays available from the top bar.
+                  </p>
+                </div>
+                <a className="button secondary" href="#detail">
+                  View detailed report
+                </a>
+              </section>
+            </section>
+
+            <section className="content-stack">
+              <CaseList
+                disputes={filteredDisputes}
+                selectedCaseId={selectedDispute?.id ?? ""}
+                onSelect={setSelectedCaseId}
+              />
+
+              <section className="panel board-panel" id="board">
+                <div className="section-top compact">
+                  <div>
+                    <span className="eyebrow dark">Queue</span>
+                    <h2>Case board</h2>
+                  </div>
+                  <p>What still needs action.</p>
+                </div>
+                <div className="queue-grid">
+                  <div className="queue-card">
+                    <span>Waiting response</span>
+                    <strong>{intakeCount}</strong>
+                    <p>Awaiting respondent participation.</p>
+                  </div>
+                  <div className="queue-card">
+                    <span>In review</span>
+                    <strong>{reviewCount}</strong>
+                    <p>Ready for analysis or mediation.</p>
+                  </div>
+                  <div className="queue-card">
+                    <span>Operator</span>
+                    <strong className="mono">{platformConfig.operator || "Unbound"}</strong>
+                    <p>Bound to this deployment.</p>
+                  </div>
+                  <div className="queue-card">
+                    <span>Selected</span>
+                    <strong>{selectedDispute ? "Loaded" : "None"}</strong>
+                    <p>
+                      {selectedDispute
+                        ? `${selectedDispute.caseType} file open below.`
+                        : "Choose a case from the list above."}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <div id="intake">
+                <DisputeWizard disabled={isPending} onCreate={createCase} />
+              </div>
+
+              <div id="detail">
+                <CaseDetail
+                  dispute={selectedDispute}
+                  operator={platformConfig.operator}
+                  connectedAddress={walletAddress}
+                  busy={isPending}
+                  onRespond={respondToCase}
+                  onAnalyze={analyzeSelectedCase}
+                  onMediation={saveMediation}
+                  onFinalize={finalizeCase}
+                  onAssignRole={assignSpecialist}
+                  onSubmitAppeal={fileAppeal}
+                  onReviewAppeal={decideAppeal}
+                />
+              </div>
+            </section>
           </div>
-
-          <div id="detail">
-            <CaseDetail
-              dispute={selectedDispute}
-              operator={platformConfig.operator}
-              connectedAddress={walletAddress}
-              busy={isPending}
-              onRespond={respondToCase}
-              onAnalyze={analyzeSelectedCase}
-              onMediation={saveMediation}
-              onFinalize={finalizeCase}
-              onAssignRole={assignSpecialist}
-              onSubmitAppeal={fileAppeal}
-              onReviewAppeal={decideAppeal}
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }

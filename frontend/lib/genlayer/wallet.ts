@@ -18,6 +18,22 @@ declare global {
   }
 }
 
+export function getInjectedEthereum() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.ethereum ?? null;
+}
+
+export function getInjectedOkxEthereum() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.okxwallet?.ethereum ?? null;
+}
+
 type Eip6963ProviderInfo = {
   rdns?: string;
   name?: string;
@@ -312,6 +328,11 @@ export function getMetaMaskProvider() {
 
   primeBrowserProviders();
 
+  const injected = getInjectedEthereum();
+  if (injected && isMetaMaskProvider(injected)) {
+    return injected;
+  }
+
   const discovered = Array.from(discoveredProviders.values()).find(
     (detail) => isMetaMaskDetail(detail) && !detail.provider.isRabby,
   );
@@ -341,6 +362,11 @@ export function getOkxProvider() {
   }
 
   primeBrowserProviders();
+
+  const injectedOkx = getInjectedOkxEthereum();
+  if (injectedOkx) {
+    return injectedOkx;
+  }
 
   const discovered = Array.from(discoveredProviders.values()).find((detail) => isOkxDetail(detail));
   if (discovered?.provider) {

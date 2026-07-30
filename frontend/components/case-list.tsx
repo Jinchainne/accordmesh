@@ -11,39 +11,57 @@ type CaseListProps = {
 
 export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) {
   return (
-    <section className="panel">
-      <div className="section-top compact">
-        <div>
-          <span className="eyebrow dark">Cases</span>
-          <h2>Open files</h2>
+    <section className="table-panel">
+      <div className="table-panel-head">
+        <h2>Recent Disputes</h2>
+        <div className="table-panel-tools">
+          <span>{disputes.length} loaded</span>
         </div>
-        <p>{disputes.length} matters loaded.</p>
       </div>
-      <div className="list">
-        {disputes.map((dispute) => (
-          <button
-            className={`case-card button-reset ${selectedCaseId === dispute.id ? "selected" : ""}`}
-            key={dispute.id}
-            type="button"
-            onClick={() => onSelect(dispute.id)}
-          >
-            <div className="meta">
-              <span className="badge">{getStageLabel(dispute.stage)}</span>
-              <span>{dispute.caseType}</span>
-              <span>{dispute.appeals.length} appeal{dispute.appeals.length === 1 ? "" : "s"}</span>
-            </div>
-            <div className="case-card-top">
-              <h3>{dispute.title}</h3>
-              <div className="readiness-pill">{getCaseReadiness(dispute)}%</div>
-            </div>
-            <p>{dispute.claimantStatement}</p>
-            <div className="case-rail" />
-            <div className="meta">
-              <span>{dispute.claimantEvidenceUrls.length} claimant items</span>
-              <span>{dispute.respondentEvidenceUrls.length} respondent items</span>
-            </div>
-          </button>
-        ))}
+      <div className="case-table-wrap">
+        <table className="case-table">
+          <thead>
+            <tr>
+              <th>Case ID</th>
+              <th>Title</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Readiness</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {disputes.length ? (
+              disputes.map((dispute) => (
+                <tr className={selectedCaseId === dispute.id ? "is-selected" : ""} key={dispute.id}>
+                  <td className="mono">{dispute.id}</td>
+                  <td>
+                    <strong>{dispute.title}</strong>
+                    <p>{dispute.claimantStatement}</p>
+                  </td>
+                  <td>
+                    <span className="table-chip">{dispute.caseType}</span>
+                  </td>
+                  <td>
+                    <span className="badge">{getStageLabel(dispute.stage)}</span>
+                  </td>
+                  <td>{getCaseReadiness(dispute)}%</td>
+                  <td>
+                    <button className="table-action" type="button" onClick={() => onSelect(dispute.id)}>
+                      Open
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="case-table-empty" colSpan={6}>
+                  No disputes have been loaded yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </section>
   );
