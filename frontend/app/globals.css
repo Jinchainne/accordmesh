@@ -693,9 +693,24 @@ p {
 
 .uploader-controls {
   display: grid;
-  grid-template-columns: 180px 1fr auto;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+}
+
+.uploader-controls > * {
+  min-width: 0;
+}
+
+.uploader-controls input[type="file"] {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.uploader-head strong,
+.uploader-head span {
+  min-width: 0;
 }
 
 .tiny-note {
