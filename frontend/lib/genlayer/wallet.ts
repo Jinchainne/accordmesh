@@ -35,6 +35,7 @@ export const ACCORDMESH_PROVIDER_EVENT = "accordmesh:providersChanged";
 const discoveredProviders = new Map<string, Eip6963ProviderDetail>();
 let discoveryInitialized = false;
 let requestProvidersTimeout: number | null = null;
+let preferredProvider: EthereumProvider | null = null;
 
 function getProviderKey(detail: Eip6963ProviderDetail) {
   return detail.info.rdns || detail.info.uuid || detail.info.name || "unknown";
@@ -141,6 +142,41 @@ function getProviderLabel(provider: EthereumProvider) {
   return "Injected";
 }
 
+function getProviderScore(provider: EthereumProvider) {
+  if (provider.isMetaMask && !provider.isRabby) {
+    return 400;
+  }
+
+  if (isOkxProvider(provider)) {
+    return 300;
+  }
+
+  if (provider.isMetaMask) {
+    return 200;
+  }
+
+  if (provider.isRabby) {
+    return 100;
+  }
+
+  return 0;
+}
+
+function pickPreferredProvider(providers: EthereumProvider[]) {
+  if (!providers.length) {
+    preferredProvider = null;
+    return null;
+  }
+
+  if (preferredProvider && providers.includes(preferredProvider)) {
+    return preferredProvider;
+  }
+
+  const rankedProviders = [...providers].sort((left, right) => getProviderScore(right) - getProviderScore(left));
+  preferredProvider = rankedProviders[0] ?? null;
+  return preferredProvider;
+}
+
 export function getBrowserProvider() {
   if (typeof window === "undefined") {
     return null;
@@ -150,25 +186,11 @@ export function getBrowserProvider() {
 
   const providers = getAllProviders();
   if (!providers.length) {
+    preferredProvider = null;
     return null;
   }
 
-  const metaMaskFromDiscovery = Array.from(discoveredProviders.values()).find(
-    (detail) => isMetaMaskDetail(detail) && !detail.provider.isRabby,
-  )?.provider;
-
-  if (metaMaskFromDiscovery) {
-    return metaMaskFromDiscovery;
-  }
-
-  return (
-    providers.find((provider) => provider.isMetaMask && !provider.isRabby) ??
-    Array.from(discoveredProviders.values()).find((detail) => isOkxDetail(detail))?.provider ??
-    providers.find((provider) => isOkxProvider(provider)) ??
-    providers.find((provider) => provider.isMetaMask) ??
-    providers[0] ??
-    null
-  );
+  return pickPreferredProvider(providers);
 }
 
 export function getDetectedWalletLabels() {
