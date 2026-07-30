@@ -430,43 +430,57 @@ export function Workspace() {
   return (
     <main className="shell shell-app">
       <header className="app-header">
-        <div className="brand-block">
-          <div className="brand-mark">A</div>
-          <div>
-            <span className="eyebrow solid">AccordMesh</span>
-            <h1>Dispute operations workspace</h1>
+        <div className="header-main">
+          <div className="brand-block">
+            <div className="brand-mark">A</div>
+            <div>
+              <span className="eyebrow solid">AccordMesh</span>
+              <h1>Dispute operations workspace</h1>
+            </div>
+          </div>
+          <div className="header-wallet">
+            <WalletPanel
+              address={walletAddress}
+              chainId={chainId}
+              hasWallet={Boolean(getBrowserProvider())}
+              isConnected={hasConnectedWallet}
+              isBusy={isPending}
+              networkName={appConfig.networkName}
+              rpcUrl={appConfig.rpcUrl}
+              message={walletMessage}
+              canConnect={Boolean(getBrowserProvider())}
+              connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
+              diagnostics={walletDiagnostics}
+              variant="compact"
+              onConnect={connectWallet}
+              onRefresh={() => {
+                startTransition(async () => {
+                  await refreshData();
+                });
+              }}
+            />
           </div>
         </div>
-        <div className="header-actions">
-          <WalletPanel
-            address={walletAddress}
-            chainId={chainId}
-            hasWallet={Boolean(getBrowserProvider())}
-            isConnected={hasConnectedWallet}
-            isBusy={isPending}
-            networkName={appConfig.networkName}
-            rpcUrl={appConfig.rpcUrl}
-            message={walletMessage}
-            canConnect={Boolean(getBrowserProvider())}
-            connectLabel={hasConnectedWallet ? "Switch to Studionet" : "Connect wallet"}
-            diagnostics={walletDiagnostics}
-            variant="compact"
-            onConnect={connectWallet}
-            onRefresh={() => {
-              startTransition(async () => {
-                await refreshData();
-              });
-            }}
-          />
-          <div className="header-chip">
-            <span>Network</span>
-            <strong>{appConfig.networkName}</strong>
+        <div className="header-bar">
+          <nav className="top-nav">
+            <a href="#overview">Overview</a>
+            <a href="#board">Case board</a>
+            <a href="#intake">Open new file</a>
+            <a href="#detail">Case workspace</a>
+          </nav>
+          <div className="header-actions">
+            <div className="header-chip">
+              <span>Network</span>
+              <strong>{appConfig.networkName}</strong>
+            </div>
+            <a className="button" href="#intake">
+              New file
+            </a>
           </div>
-          <a className="button" href="#intake">
-            New file
-          </a>
         </div>
       </header>
+
+      <div className="header-spacer" aria-hidden="true" />
 
       {errorMessage ? (
         <section className="panel error-panel">
@@ -491,13 +505,6 @@ export function Workspace() {
               specialist routing, and regulator-ready outputs.
             </p>
           </section>
-
-          <nav className="panel section-nav">
-            <a href="#overview">Overview</a>
-            <a href="#board">Case board</a>
-            <a href="#intake">Open new file</a>
-            <a href="#detail">Case workspace</a>
-          </nav>
 
           <CaseList
             disputes={disputes}

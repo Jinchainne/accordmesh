@@ -42,7 +42,7 @@ a {
 #board,
 #intake,
 #detail {
-  scroll-margin-top: 140px;
+  scroll-margin-top: 220px;
 }
 
 p {
@@ -109,20 +109,29 @@ p {
 }
 
 .app-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: center;
   position: sticky;
-  top: 16px;
-  z-index: 40;
-  padding: 18px 22px;
+  top: 0;
+  z-index: 60;
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px;
   border: 1px solid var(--line);
   border-radius: 28px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(250, 247, 241, 0.96)),
     var(--bg-panel);
   box-shadow: var(--shadow);
+}
+
+.header-spacer {
+  display: none;
+}
+
+.header-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 20px;
+  align-items: start;
 }
 
 .brand-block {
@@ -151,16 +160,40 @@ p {
   font-weight: 800;
 }
 
-.header-actions {
+.header-wallet {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
+.header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.top-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.top-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: rgba(20, 41, 58, 0.04);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .wallet-panel-compact {
-  min-width: min(100%, 420px);
+  width: 100%;
+  min-width: 0;
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -170,26 +203,45 @@ p {
   box-shadow: var(--shadow);
 }
 
-.wallet-panel-top {
-  margin-bottom: 10px;
+.wallet-compact-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
 }
 
-.wallet-panel-top h2 {
+.wallet-compact-head h2 {
   margin: 10px 0 0;
   font-size: 22px;
-  line-height: 1;
+  line-height: 1.05;
 }
 
-.wallet-panel-grid {
-  gap: 10px;
+.wallet-compact-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.wallet-panel-compact .status-row {
-  padding-bottom: 6px;
-}
-
-.wallet-panel-compact .stage-card {
+.wallet-compact-address {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
   padding: 14px;
+  border-radius: 18px;
+  background: rgba(20, 41, 58, 0.04);
+  border: 1px solid rgba(20, 41, 58, 0.08);
+}
+
+.wallet-compact-address strong {
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.wallet-compact-address span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .wallet-panel-actions {
@@ -200,8 +252,22 @@ p {
   padding: 11px 16px;
 }
 
-.wallet-diagnostic-list-compact {
-  min-height: 0;
+.wallet-compact-diagnostics {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.wallet-compact-diagnostics .diagnostic-row strong {
+  max-width: 58%;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .header-chip {
@@ -860,18 +926,22 @@ p {
 
   .section-top,
   .case-card-top,
-  .case-header,
-  .app-header {
+  .case-header {
     flex-direction: column;
   }
 
-  .header-actions {
-    width: 100%;
-    justify-content: stretch;
+  .header-main {
+    grid-template-columns: 1fr;
   }
 
-  .wallet-panel-compact {
+  .header-wallet,
+  .header-actions {
     width: 100%;
+    justify-content: flex-start;
+  }
+
+  .header-bar {
+    align-items: start;
   }
 }
 
@@ -896,5 +966,60 @@ p {
 
   .summary-panel-primary h2 {
     font-size: 30px;
+  }
+
+  .app-header {
+    padding: 14px;
+  }
+
+  .brand-block {
+    align-items: start;
+  }
+
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    font-size: 20px;
+  }
+
+  .brand-block h1 {
+    font-size: 22px;
+    line-height: 1.15;
+  }
+
+  .wallet-compact-head,
+  .header-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wallet-compact-badges {
+    justify-content: flex-start;
+  }
+
+  .top-nav,
+  .header-actions {
+    width: 100%;
+  }
+
+  .top-nav a,
+  .header-chip,
+  .header-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .wallet-panel-actions .button {
+    width: 100%;
+  }
+
+  .wallet-compact-diagnostics .diagnostic-row {
+    flex-direction: column;
+  }
+
+  .wallet-compact-diagnostics .diagnostic-row strong {
+    max-width: 100%;
+    text-align: left;
   }
 }
