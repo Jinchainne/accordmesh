@@ -112,51 +112,37 @@ p {
   position: sticky;
   top: 0;
   z-index: 60;
-  display: grid;
-  gap: 8px;
-  padding: 10px 16px 12px;
+  padding: 8px 14px;
   border: 1px solid rgba(17, 40, 56, 0.14);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 241, 0.98)),
-    var(--bg-panel);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow);
 }
 
-.masthead-line {
-  display: flex;
-  justify-content: space-between;
+.header-strip {
+  display: grid;
+  grid-template-columns: auto minmax(280px, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding-bottom: 8px;
-  border-bottom: 3px double rgba(17, 40, 56, 0.2);
+}
+
+.header-strip-left,
+.header-strip-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-strip-right {
+  justify-content: flex-end;
+}
+
+.header-kicker {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.header-spacer {
-  display: none;
-}
-
-.header-main {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 0.95fr) minmax(320px, 390px);
-  gap: 10px;
-  align-items: center;
-}
-
-.masthead-side {
-  display: flex;
-  align-items: center;
-}
-
-.masthead-logo {
-  display: grid;
-  gap: 2px;
-  align-content: center;
 }
 
 .masthead-brand {
@@ -167,12 +153,8 @@ p {
   letter-spacing: -0.04em;
 }
 
-.masthead-subtitle {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.masthead-brand-inline {
+  font-size: 1.1rem;
 }
 
 .header-search {
@@ -184,142 +166,93 @@ p {
 
 .header-search input {
   width: 100%;
-  min-height: 44px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid rgba(18, 48, 68, 0.16);
   border-right: 0;
-  border-radius: 10px 0 0 10px;
+  border-radius: 8px 0 0 8px;
   background: #fff;
   color: var(--ink);
   font: inherit;
 }
 
 .header-search .button {
-  min-height: 44px;
-  border-radius: 0 10px 10px 0;
-  padding: 0 18px;
-}
-
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--ink), #20455d);
-  color: #fff;
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.header-wallet {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.header-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-top: 8px;
-  border-top: 1px solid rgba(18, 48, 68, 0.08);
+  min-height: 36px;
+  border-radius: 0 8px 8px 0;
+  padding: 0 14px;
 }
 
 .wallet-panel-compact {
-  width: 100%;
+  width: auto;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 244, 236, 0.98)),
-    var(--bg-panel);
+  padding: 0;
+  border: 0;
+  background: transparent;
   box-shadow: none;
 }
 
 .wallet-compact-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
+  gap: 6px;
 }
 
-.wallet-compact-badges {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.wallet-panel-compact .eyebrow,
+.wallet-panel-feedback-compact,
+.wallet-compact-details,
+.wallet-compact-summary span {
+  display: none;
 }
 
 .wallet-compact-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.wallet-compact-summary {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
+  margin-top: 0;
+  gap: 8px;
 }
 
 .wallet-compact-summary strong {
-  font-size: 14px;
-  line-height: 1.2;
-}
-
-.wallet-compact-summary span {
+  font-size: 12px;
+  font-weight: 700;
   color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .wallet-panel-actions {
-  margin-top: 0;
-  flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .wallet-panel-compact .button {
-  padding: 9px 14px;
-  min-height: 38px;
+  min-height: 36px;
+  padding: 0 14px;
 }
 
-.wallet-compact-diagnostics {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
+.header-chip {
+  min-width: 0;
+  padding: 7px 12px;
 }
 
-.wallet-compact-details {
-  margin-top: 8px;
+.header-chip strong {
+  margin-top: 2px;
 }
 
-.wallet-compact-details summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
+.header-spacer {
+  display: none;
 }
 
-.wallet-panel-feedback-compact {
-  min-height: 0;
-  margin-top: 6px;
+.wallet-compact-badges .badge {
+  padding: 5px 8px;
+  font-size: 11px;
 }
 
-.wallet-panel-feedback-compact .tiny-note {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.35;
+.wallet-compact-badges {
+  gap: 4px;
 }
 
-.wallet-compact-diagnostics .diagnostic-row strong {
-  max-width: 58%;
+.header-strip-right > .button {
+  min-height: 36px;
+  padding: 0 16px;
+}
+
+.wallet-panel-compact {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 8px;
 }
 
 .header-actions {
@@ -1109,27 +1042,18 @@ p {
     flex-direction: column;
   }
 
-  .header-main {
+  .header-strip {
     grid-template-columns: 1fr;
-  }
-
-  .masthead-side {
-    display: none;
-  }
-
-  .header-wallet,
-  .header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .header-bar {
-    align-items: start;
   }
 
   .warning-banner {
     align-items: start;
     flex-direction: column;
+  }
+
+  .header-strip-left,
+  .header-strip-right {
+    flex-wrap: wrap;
   }
 
   .header-search {
@@ -1175,37 +1099,14 @@ p {
     font-size: 30px;
   }
 
-  .app-header {
-    padding: 14px;
-  }
-
   .masthead-brand {
     font-size: 1.5rem;
   }
 
-  .masthead-logo,
-  .wallet-compact-bar,
-  .header-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .wallet-compact-badges {
+  .header-strip-right,
+  .wallet-panel-actions {
+    width: 100%;
     justify-content: flex-start;
-  }
-
-  .header-actions {
-    width: 100%;
-  }
-
-  .header-chip,
-  .header-actions .button {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .wallet-panel-actions .button {
-    width: 100%;
   }
 
   .file-picker {

@@ -482,14 +482,10 @@ export function Workspace() {
   return (
     <main className="shell shell-app">
       <header className="app-header">
-        <div className="masthead-line">
-          <span>Studionet edition</span>
-          <span>{editionLabel}</span>
-        </div>
-        <div className="header-main">
-          <div className="masthead-side masthead-logo">
-            <span className="masthead-brand">AccordMesh</span>
-            <span className="masthead-subtitle">GenLayer dispute desk</span>
+        <div className="header-strip">
+          <div className="header-strip-left">
+            <span className="header-kicker">Studionet edition</span>
+            <span className="masthead-brand masthead-brand-inline">AccordMesh</span>
           </div>
           <form className="header-search" role="search" onSubmit={(event) => event.preventDefault()}>
             <input
@@ -503,7 +499,11 @@ export function Workspace() {
               Search
             </button>
           </form>
-          <div className="header-wallet">
+          <div className="header-strip-right">
+            <div className="header-chip">
+              <span>Network</span>
+              <strong>{appConfig.networkName}</strong>
+            </div>
             <WalletPanel
               address={walletAddress}
               chainId={chainId}
@@ -531,14 +531,6 @@ export function Workspace() {
                 });
               }}
             />
-          </div>
-        </div>
-        <div className="header-bar">
-          <div className="header-actions">
-            <div className="header-chip">
-              <span>Network</span>
-              <strong>{appConfig.networkName}</strong>
-            </div>
             <a className="button" href="#intake">
               New file
             </a>
