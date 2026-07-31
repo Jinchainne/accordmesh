@@ -21,6 +21,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  height: 100%;
   background:
     radial-gradient(circle at top left, rgba(189, 108, 67, 0.1), transparent 18%),
     radial-gradient(circle at 100% 0%, rgba(15, 123, 102, 0.1), transparent 20%),
@@ -31,6 +32,7 @@ body {
 
 body {
   padding: 10px;
+  overflow: hidden;
 }
 
 a {
@@ -42,7 +44,7 @@ a {
 #board,
 #intake,
 #detail {
-  scroll-margin-top: 24px;
+  scroll-margin-top: 96px;
 }
 
 p {
@@ -124,9 +126,13 @@ p {
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   gap: 20px;
+  height: calc(100vh - 20px);
   padding: 24px 18px;
   background: rgba(248, 250, 255, 0.9);
   border-right: 1px solid rgba(17, 40, 56, 0.08);
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
 }
 
 .sidebar-brand {
@@ -190,6 +196,8 @@ p {
 }
 
 .sidebar-cta {
+  display: grid;
+  gap: 10px;
   align-self: end;
 }
 
@@ -198,6 +206,13 @@ p {
   justify-content: center;
   border-radius: 12px;
   min-height: 48px;
+}
+
+.sidebar-secondary-button {
+  width: 100%;
+  justify-content: center;
+  border-radius: 12px;
+  min-height: 44px;
 }
 
 .sidebar-meta-links {
@@ -210,10 +225,16 @@ p {
 .dashboard-main {
   display: grid;
   grid-template-rows: auto auto 1fr;
+  height: calc(100vh - 20px);
   min-width: 0;
+  overflow-y: auto;
+  scroll-behavior: smooth;
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -223,40 +244,23 @@ p {
   border-bottom: 1px solid rgba(17, 40, 56, 0.08);
 }
 
-.topbar-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: min(420px, 100%);
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid rgba(17, 40, 56, 0.12);
-  border-radius: 999px;
-  background: #fff;
-}
-
-.topbar-search input {
-  flex: 1;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  outline: 0;
-}
-
-.topbar-search-icon,
-.topbar-icon {
+.topbar-title {
   display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  color: var(--muted);
+  gap: 2px;
 }
 
-.topbar-icon {
-  border: 1px solid rgba(17, 40, 56, 0.08);
-  background: #fff;
+.topbar-title span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.topbar-title strong {
+  color: #0f172a;
+  font-size: 1.4rem;
+  line-height: 1.1;
 }
 
 .topbar-actions {
@@ -594,21 +598,13 @@ p {
   flex-wrap: nowrap;
 }
 
-.wallet-provider-buttons {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.wallet-provider-button {
-  min-height: 30px;
-  padding: 0 10px;
-  font-size: 12px;
-}
-
 .wallet-panel-compact .button {
   min-height: 34px;
   padding: 0 12px;
+}
+
+.wallet-panel-compact .button.secondary {
+  display: none;
 }
 
 .header-spacer {
@@ -1361,6 +1357,17 @@ p {
     flex-wrap: wrap;
   }
 
+  .topbar {
+    align-items: start;
+    flex-direction: column;
+    padding: 14px 18px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .wallet-compact-main {
     flex-direction: column;
     align-items: stretch;
@@ -1370,9 +1377,6 @@ p {
     flex-wrap: wrap;
   }
 
-  .wallet-provider-buttons {
-    width: 100%;
-  }
 }
 
 @media (max-width: 920px) {

@@ -4,8 +4,6 @@ type WalletPanelProps = {
   address: string;
   chainId: string;
   hasWallet: boolean;
-  hasMetaMask?: boolean;
-  hasOkx?: boolean;
   isConnected: boolean;
   isReady: boolean;
   isBusy: boolean;
@@ -17,8 +15,6 @@ type WalletPanelProps = {
   diagnostics: Array<{ label: string; value: string; tone?: "default" | "ok" | "warn" | "danger" }>;
   variant?: "full" | "compact";
   onConnect(): void;
-  onConnectMetaMask?(): void;
-  onConnectOkx?(): void;
   onRefresh(): void;
 };
 
@@ -26,8 +22,6 @@ export function WalletPanel({
   address,
   chainId,
   hasWallet,
-  hasMetaMask = false,
-  hasOkx = false,
   isConnected,
   isReady,
   isBusy,
@@ -39,8 +33,6 @@ export function WalletPanel({
   diagnostics,
   variant = "full",
   onConnect,
-  onConnectMetaMask,
-  onConnectOkx,
   onRefresh,
 }: WalletPanelProps) {
   const isCompact = variant === "compact";
@@ -66,30 +58,6 @@ export function WalletPanel({
                 {connectLabel}
               </button>
             </div>
-            {!isConnected && (hasMetaMask || hasOkx) ? (
-              <div className="wallet-provider-buttons">
-                {hasMetaMask ? (
-                  <button
-                    className="button secondary wallet-provider-button"
-                    type="button"
-                    onClick={onConnectMetaMask}
-                    disabled={isBusy || !canConnect}
-                  >
-                    MetaMask
-                  </button>
-                ) : null}
-                {hasOkx ? (
-                  <button
-                    className="button secondary wallet-provider-button"
-                    type="button"
-                    onClick={onConnectOkx}
-                    disabled={isBusy || !canConnect}
-                  >
-                    OKX
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
           </div>
           <div className="wallet-panel-feedback wallet-panel-feedback-compact">
             {message ? <p className="tiny-note">{message}</p> : <p className="tiny-note wallet-feedback-placeholder" />}

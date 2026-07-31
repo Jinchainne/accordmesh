@@ -9,11 +9,6 @@ import {
   getBrowserProviders,
   getDetectedWalletLabels,
   getInjectedEthereum,
-  getInjectedOkxEthereum,
-  getMetaMaskProvider,
-  getOkxProvider,
-  hasDedicatedMetaMaskProvider,
-  hasOkxProvider,
   rememberBrowserProvider,
   setActiveBrowserProvider,
   waitForBrowserProviders,
@@ -418,48 +413,6 @@ export function Workspace() {
     ]);
   }
 
-  async function connectNamedWallet(kind: "metamask" | "okx") {
-    const provider =
-      kind === "metamask"
-        ? getInjectedEthereum() ?? getMetaMaskProvider()
-        : getInjectedOkxEthereum() ?? getOkxProvider();
-    if (!provider) {
-      setWalletMessage(
-        kind === "metamask"
-          ? "MetaMask was not detected in this browser."
-          : "OKX Wallet was not detected in this browser.",
-      );
-      await inspectWallet();
-      return;
-    }
-
-    try {
-      rememberBrowserProvider(provider);
-      setActiveBrowserProvider(provider);
-      setWalletMessage(`Requesting ${kind === "metamask" ? "MetaMask" : "OKX Wallet"} access...`);
-      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-      const nextAddress = accounts[0] ?? "";
-
-      if (!nextAddress) {
-        throw new Error("Wallet detected, but no account was returned.");
-      }
-
-      await prepareConnectedWallet(nextAddress, provider);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Wallet access request failed.";
-      setErrorMessage(message);
-      setWalletMessage(message);
-      setWalletDiagnostics((current) => [
-        ...current.filter((item) => item.label !== "Connect step"),
-        {
-          label: "Connect step",
-          value: `${kind === "metamask" ? "MetaMask" : "OKX Wallet"}: ${message}`,
-          tone: "danger",
-        },
-      ]);
-    }
-  }
-
   async function handleWalletAction() {
     if (!hasConnectedWallet) {
       await connectWallet();
@@ -559,6 +512,17 @@ export function Workspace() {
             <a className="button sidebar-primary-button" href="#intake">
               New dispute
             </a>
+            <button
+              className="button secondary sidebar-secondary-button"
+              type="button"
+              onClick={() => {
+                startTransition(async () => {
+                  await refreshData();
+                });
+              }}
+            >
+              Refresh cases
+            </button>
           </div>
 
           <div className="sidebar-meta-links">
@@ -569,23 +533,15 @@ export function Workspace() {
 
         <section className="dashboard-main">
           <header className="topbar">
-            <div className="topbar-search">
-              <span className="topbar-search-icon">o</span>
-              <input aria-label="Search cases" placeholder="Search cases..." type="text" />
+            <div className="topbar-title">
+              <span>Studionet edition</span>
+              <strong>Wallet access</strong>
             </div>
             <div className="topbar-actions">
-              <button className="topbar-icon" type="button" aria-label="Notifications">
-                o
-              </button>
-              <button className="topbar-icon" type="button" aria-label="Settings">
-                +
-              </button>
               <WalletPanel
                 address={walletAddress}
                 chainId={chainId}
                 hasWallet={Boolean(getActiveBrowserProvider())}
-                hasMetaMask={hasDedicatedMetaMaskProvider()}
-                hasOkx={hasOkxProvider()}
                 isConnected={hasConnectedWallet}
                 isReady={isStudionetReady}
                 isBusy={isPending}
@@ -603,17 +559,7 @@ export function Workspace() {
                 diagnostics={walletDiagnostics}
                 variant="compact"
                 onConnect={handleWalletAction}
-                onConnectMetaMask={() => {
-                  void connectNamedWallet("metamask");
-                }}
-                onConnectOkx={() => {
-                  void connectNamedWallet("okx");
-                }}
-                onRefresh={() => {
-                  startTransition(async () => {
-                    await refreshData();
-                  });
-                }}
+                onRefresh={refreshData}
               />
               <div className="topbar-avatar" aria-hidden="true">
                 {walletAddress ? walletAddress.slice(2, 4).toUpperCase() : "GM"}
@@ -679,8 +625,8 @@ export function Workspace() {
                     Wallet-based signing stays available from the top bar.
                   </p>
                 </div>
-                <a className="button secondary" href="#detail">
-                  View detailed report
+                <a className="button secondary" href="#board">
+                  Review queue
                 </a>
               </section>
             </section>
