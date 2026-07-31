@@ -3,6 +3,8 @@ import type { DisputeRecord } from "./types";
 export function getCaseReadiness(dispute: DisputeRecord) {
   let score = 20;
 
+  if (dispute.escrow.claimantDeposited) score += 10;
+  if (dispute.escrow.respondentDeposited) score += 10;
   if (dispute.claimantStatement.trim()) score += 15;
   if (dispute.claimantEvidenceUrls.length) score += 15;
   if (dispute.respondentStatement.trim()) score += 15;
@@ -17,6 +19,8 @@ export function getCaseReadiness(dispute: DisputeRecord) {
 
 export function getStageLabel(stage: DisputeRecord["stage"]) {
   switch (stage) {
+    case "STAKE_PENDING":
+      return "Awaiting respondent stake";
     case "RESPONSE_PENDING":
       return "Response pending";
     case "ANALYSIS_READY":
@@ -29,4 +33,3 @@ export function getStageLabel(stage: DisputeRecord["stage"]) {
       return stage;
   }
 }
-

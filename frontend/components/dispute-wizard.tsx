@@ -11,6 +11,7 @@ const initialState: NewDisputeInput = {
   respondent: "",
   claimantStatement: "",
   evidenceUrls: "",
+  stakeAmountGen: "1",
 };
 
 type DisputeWizardProps = {
@@ -113,6 +114,20 @@ export function DisputeWizard({ disabled, onCreate }: DisputeWizardProps) {
             value={form.respondent}
             onChange={(event) => update("respondent", event.target.value)}
             placeholder="0x..."
+            required
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="stakeAmountGen">Stake per side (GEN)</label>
+          <input
+            id="stakeAmountGen"
+            type="number"
+            min="0.0001"
+            step="0.0001"
+            value={form.stakeAmountGen}
+            onChange={(event) => update("stakeAmountGen", event.target.value)}
+            placeholder="1.5"
             required
           />
         </div>

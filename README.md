@@ -1,25 +1,27 @@
 # AccordMesh
 
-AccordMesh is a GenLayer-native dispute casework platform focused on intake, evidence organization, mediation, and resolution drafting.
+AccordMesh is a GenLayer-native dispute casework platform focused on intake, bilateral GEN escrow, evidence organization, mediation, and resolution drafting.
 
 Live deployment:
 
 - Frontend: https://accordmesh.vercel.app
-- Studionet contract: `0x5187c794213c17Ab3E3e4Aa1EB9E7d9DD19BEC2b`
+- Studionet contract: `0x4f4EdcAf1d8Fe65523aB0FEb92F79D17Cc9140FE`
 
 This repo is intentionally designed to be structurally and conceptually different from verdict-and-betting dispute apps. The MVP centers on phased casework:
 
-1. Intake and structured dispute filing
-2. Respondent response collection
-3. AI-generated issue map and mediation options
-4. Resolution memo drafting
+1. Claimant files a dispute and posts GEN stake
+2. Respondent matches the GEN stake to contest the claim
+3. Respondent response collection
+4. AI-generated issue map and mediation options
+5. Resolution memo drafting and escrow settlement
 
 ## Architecture
 
 - `contracts/accord_mesh.py`
   - GenLayer Intelligent Contract
   - Stores dispute records as serialized case documents
-  - Enforces the dispute state machine
+  - Enforces the dispute + escrow state machine
+  - Holds bilateral GEN stake and settles payout on operator ruling
   - Runs AI analysis for issue mapping and settlement options
 - `frontend/`
   - Next.js App Router frontend
@@ -55,8 +57,8 @@ This project is built as a separate product concept with:
 
 ## MVP workflow
 
-1. Claimant files a dispute with type, title, narrative, and evidence links
-2. Respondent submits a response and supporting links
+1. Claimant files a dispute with type, title, narrative, evidence links, and matching GEN stake
+2. Respondent matches the required GEN stake and submits a response with supporting links
 3. Anyone authorized to operate the case runs AI analysis
 4. The contract stores:
    - issue map
@@ -64,7 +66,8 @@ This project is built as a separate product concept with:
    - three settlement options
    - a draft resolution memo
 5. Parties can record their mediation position
-6. Case can be marked resolved once the operator publishes final terms
+6. Operator settles the dispute by choosing the prevailing side, loser penalty, and operator fee
+7. Case is marked resolved once the final terms and payout split are published
 
 ## Current project status
 
@@ -81,13 +84,14 @@ This repo now includes:
 - role assignment for counsel, reviewer, and regulator
 - appeal filing and appeal review workflows
 - PDF-ready decision memo output
+- claimant/respondent bilateral GEN escrow
+- winner/loser/operator payout settlement logic
 
 ## GenLayer network notes
 
-According to the current GenLayer docs, `studionet` is the hosted development environment and can be targeted via the CLI with:
+According to the current GenLayer docs, `studionet` is the hosted development environment and the contract can be deployed directly with:
 
 ```powershell
-genlayer network studionet
 genlayer deploy --contract contracts/accord_mesh.py
 ```
 
@@ -140,7 +144,6 @@ npm run dev
 ### 5. Deploy the contract
 
 ```powershell
-genlayer network studionet
 genlayer deploy --contract contracts/accord_mesh.py --args "AccordMesh" "ipfs://community-rules"
 ```
 
@@ -167,8 +170,7 @@ Official references:
 - Writing to Intelligent Contracts: https://docs.genlayer.com/developers/decentralized-applications/writing-data
 - Network configuration: https://docs.genlayer.com/developers/intelligent-contracts/deploying/network-configuration
 
-## Next build steps
+## Production notes
 
-- add evidence upload/storage strategy
-- add counsel roles and reviewer roles
-- add appeal requests and sealed evidence lanes
+- The live Studionet contract deployed on July 31, 2026 is `0x4f4EdcAf1d8Fe65523aB0FEb92F79D17Cc9140FE`.
+- Frontend fallback config now points to this contract by default.

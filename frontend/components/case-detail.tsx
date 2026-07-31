@@ -1,5 +1,6 @@
 "use client";
 
+import { formatEther } from "viem";
 import { useState, useTransition } from "react";
 import { getCaseReadiness, getStageLabel } from "../lib/domain/derived";
 import { getPolicyPack } from "../lib/domain/policy-packs";
@@ -10,6 +11,7 @@ import type {
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
+  PrevailingParty,
   RegulatoryPacket,
   ResponseInput,
   RoleName,
@@ -21,6 +23,7 @@ type CaseDetailProps = {
   operator: string;
   connectedAddress: string;
   busy: boolean;
+  onFundRespondentStake(caseId: string): Promise<void>;
   onRespond(input: ResponseInput): Promise<void>;
   onAnalyze(caseId: string): Promise<void>;
   onMediation(input: MediationInput): Promise<void>;
@@ -34,6 +37,16 @@ function normalized(value: string) {
   return value.trim().toLowerCase();
 }
 
+function formatGen(wei: string) {
+  try {
+    return `${Number(formatEther(BigInt(wei || "0"))).toLocaleString("en-US", {
+      maximumFractionDigits: 4,
+    })} GEN`;
+  } catch {
+    return "0 GEN";
+  }
+}
+
 function buildRegulatoryPacket(dispute: DisputeRecord): RegulatoryPacket {
   return {
     coverTitle: `Regulatory Submission Packet for Case ${dispute.id}`,
@@ -45,7 +58,10 @@ function buildRegulatoryPacket(dispute: DisputeRecord): RegulatoryPacket {
       "Prepared as a neutral digital casework dossier for downstream review by a regulator, marketplace trust team, ombuds office, or oversight body.",
     proceduralHistory: [
       `Case filed under ${dispute.caseType}.`,
-      "Claimant statement and supporting links were recorded.",
+      `Claimant escrow posted: ${formatGen(dispute.escrow.claimantStakeWei)}.`,
+      dispute.escrow.respondentDeposited
+        ? `Respondent escrow posted: ${formatGen(dispute.escrow.respondentStakeWei)}.`
+        : "Respondent escrow has not been posted yet.",
       dispute.respondentStatement
         ? "Respondent statement and supporting links were recorded."
         : "Respondent statement was not recorded in the current file.",
@@ -55,9 +71,9 @@ function buildRegulatoryPacket(dispute: DisputeRecord): RegulatoryPacket {
       Object.keys(dispute.mediationPositions).length
         ? "Mediation positions were captured from one or more parties."
         : "No mediation position has been recorded in the current file.",
-      dispute.finalTerms
-        ? "Final terms were published and the matter reached a resolved state."
-        : "Final terms have not yet been published.",
+      dispute.escrow.settled
+        ? `Escrow was settled with ${dispute.escrow.winner || "no"} prevailing party on record.`
+        : "Escrow has not yet been settled.",
     ],
     evidenceIndex: [
       ...dispute.claimantEvidenceUrls.map((url, index) => `Claimant Exhibit C-${index + 1}: ${url}`),
@@ -73,9 +89,9 @@ function buildRegulatoryPacket(dispute: DisputeRecord): RegulatoryPacket {
       ? dispute.settlementOptions
       : [dispute.draftResolution || "No settlement or resolution basis available."],
     postResolutionActions: [
-      dispute.finalTerms || "Publish enforceable final terms.",
+      dispute.finalTerms || "Publish enforceable final terms and settle escrow.",
       "Preserve evidence links and timeline records for third-party review.",
-      "Attach payment, refund, or compliance confirmation generated after resolution.",
+      "Archive payout receipts for claimant, respondent, and operator fee.",
     ],
   };
 }
@@ -94,6 +110,7 @@ export function CaseDetail({
   operator,
   connectedAddress,
   busy,
+  onFundRespondentStake,
   onRespond,
   onAnalyze,
   onMediation,
@@ -107,6 +124,9 @@ export function CaseDetail({
   const [mediationOption, setMediationOption] = useState<MediationInput["option"]>("A");
   const [mediationRationale, setMediationRationale] = useState("");
   const [finalTerms, setFinalTerms] = useState("");
+  const [prevailingParty, setPrevailingParty] = useState<PrevailingParty>("CLAIMANT");
+  const [loserPenaltyBps, setLoserPenaltyBps] = useState("7000");
+  const [operatorFeeBps, setOperatorFeeBps] = useState("500");
   const [role, setRole] = useState<Exclude<RoleName, "claimant" | "respondent">>("counsel");
   const [roleAssignee, setRoleAssignee] = useState("");
   const [appealAction, setAppealAction] = useState("Reopen mediation");
@@ -135,9 +155,12 @@ export function CaseDetail({
     currentDispute.roles.reviewer.some((address) => normalized(address) === current) || isOperator;
   const isRegulator =
     currentDispute.roles.regulator.some((address) => normalized(address) === current) || isOperator;
-  const canAppeal = currentDispute.stage === "RESOLVED" && isCaseParticipant(currentDispute, connectedAddress);
+  const canAppeal =
+    currentDispute.stage === "RESOLVED" && isCaseParticipant(currentDispute, connectedAddress);
   const policyPack = getPolicyPack(currentDispute.caseType);
   const regulatoryPacket = buildRegulatoryPacket(currentDispute);
+  const requiredStakeLabel = formatGen(currentDispute.escrow.requiredStakeWei);
+  const totalEscrowLabel = formatGen(currentDispute.escrow.totalEscrowWei);
 
   function exportCasePackage() {
     const payload = [
@@ -146,6 +169,8 @@ export function CaseDetail({
       `Title: ${currentDispute.title}`,
       `Type: ${currentDispute.caseType}`,
       `Stage: ${currentDispute.stage}`,
+      `Required stake: ${requiredStakeLabel} per side`,
+      `Total escrow: ${totalEscrowLabel}`,
       "",
       "Claimant Statement",
       currentDispute.claimantStatement,
@@ -235,6 +260,7 @@ export function CaseDetail({
           <div class="block card"><h2>Executive Summary</h2><p>${regulatoryPacket.executiveSummary}</p></div>
           <div class="block card"><h2>Issue Map</h2><p>${currentDispute.issueMap || "Not available"}</p></div>
           <div class="block card"><h2>Decision Basis</h2><p>${currentDispute.draftResolution || currentDispute.finalTerms || "Not available"}</p></div>
+          <div class="block card"><h2>Escrow Outcome</h2><p>Required stake: ${requiredStakeLabel}. Total escrow: ${totalEscrowLabel}. Winner: ${currentDispute.escrow.winner || "Pending"}.</p></div>
           <div class="block card"><h2>Final Terms</h2><p>${currentDispute.finalTerms || "Not published"}</p></div>
           <div class="block card"><h2>Evidence Index</h2><ul>${regulatoryPacket.evidenceIndex.map((item) => `<li>${item}</li>`).join("")}</ul></div>
           <script>window.onload = () => window.print()</script>
@@ -274,6 +300,7 @@ export function CaseDetail({
       <div className="meta large-meta">
         <span>Case #{currentDispute.id}</span>
         <span>{getStageLabel(currentDispute.stage)}</span>
+        <span>Escrow {totalEscrowLabel}</span>
         <span>Appeals {currentDispute.appeals.length}</span>
       </div>
 
@@ -316,20 +343,66 @@ export function CaseDetail({
           </div>
         </div>
 
-        <div className="three-col">
+        <div className="role-grid">
           <div className="stage-card">
             <h3>Claimant</h3>
             <p className="mono">{currentDispute.claimant}</p>
+            <p>Stake posted: {formatGen(currentDispute.escrow.claimantStakeWei)}</p>
           </div>
           <div className="stage-card">
             <h3>Respondent</h3>
             <p className="mono">{currentDispute.respondent}</p>
+            <p>
+              Stake posted:{" "}
+              {currentDispute.escrow.respondentDeposited
+                ? formatGen(currentDispute.escrow.respondentStakeWei)
+                : "Pending"}
+            </p>
           </div>
           <div className="stage-card">
             <h3>Operator</h3>
             <p className="mono">{operator || "Unbound"}</p>
+            <p>Fee on ruling: {currentDispute.escrow.operatorFeeBps / 100}%</p>
           </div>
         </div>
+
+        <div className="three-col">
+          <div className="stage-card">
+            <h3>Stake per side</h3>
+            <p>{requiredStakeLabel}</p>
+          </div>
+          <div className="stage-card">
+            <h3>Total escrow</h3>
+            <p>{totalEscrowLabel}</p>
+          </div>
+          <div className="stage-card">
+            <h3>Escrow status</h3>
+            <p>
+              {currentDispute.escrow.settled
+                ? `Settled for ${currentDispute.escrow.winner}`
+                : currentDispute.escrow.respondentDeposited
+                  ? "Fully funded"
+                  : "Waiting for respondent funding"}
+            </p>
+          </div>
+        </div>
+
+        {currentDispute.escrow.settled ? (
+          <div className="three-col">
+            <div className="stage-card">
+              <h3>Winner payout</h3>
+              <p>{formatGen(currentDispute.escrow.winnerPayoutWei)}</p>
+            </div>
+            <div className="stage-card">
+              <h3>Loser refund</h3>
+              <p>{formatGen(currentDispute.escrow.loserRefundWei)}</p>
+            </div>
+            <div className="stage-card">
+              <h3>Operator fee</h3>
+              <p>{formatGen(currentDispute.escrow.operatorFeeWei)}</p>
+            </div>
+          </div>
+        ) : null}
 
         <div className="role-grid">
           {(["counsel", "reviewer", "regulator"] as const).map((roleName) => (
@@ -563,6 +636,24 @@ export function CaseDetail({
           </div>
         ) : null}
 
+        {currentDispute.stage === "STAKE_PENDING" && isRespondent ? (
+          <div className="stage-card">
+            <h3>Join dispute and post respondent stake</h3>
+            <p>
+              To contest this claim, the respondent must post the matching escrow amount of{" "}
+              {requiredStakeLabel}.
+            </p>
+            <button
+              className="button"
+              type="button"
+              disabled={busy || isPending}
+              onClick={() => run(() => onFundRespondentStake(currentDispute.id))}
+            >
+              Deposit respondent stake
+            </button>
+          </div>
+        ) : null}
+
         {currentDispute.stage === "RESPONSE_PENDING" && isRespondent ? (
           <div className="stage-card">
             <h3>Submit respondent response</h3>
@@ -609,7 +700,7 @@ export function CaseDetail({
             <h3>Run AI analysis</h3>
             <p>
               This runs the issue map, credibility notes, and settlement-path generation on
-              GenLayer.
+              GenLayer after both escrow deposits and the respondent record are in place.
             </p>
             <button
               className="button"
@@ -671,31 +762,80 @@ export function CaseDetail({
 
         {currentDispute.stage === "MEDIATION_OPEN" && isOperator ? (
           <div className="stage-card">
-            <h3>Publish final terms</h3>
+            <h3>Issue ruling and settle escrow</h3>
             <div className="form">
               <div className="field">
-                <label htmlFor="finalTerms">Final terms</label>
+                <label htmlFor="finalTerms">Final ruling</label>
                 <textarea
                   id="finalTerms"
                   value={finalTerms}
                   onChange={(event) => setFinalTerms(event.target.value)}
-                  placeholder="Summarize the agreed or imposed resolution terms."
+                  placeholder="Summarize liability, remedy, deadlines, and why the winner prevailed."
+                />
+              </div>
+              <div className="two-col">
+                <div className="field">
+                  <label htmlFor="prevailingParty">Winning side</label>
+                  <select
+                    id="prevailingParty"
+                    value={prevailingParty}
+                    onChange={(event) => setPrevailingParty(event.target.value as PrevailingParty)}
+                  >
+                    <option value="CLAIMANT">Claimant</option>
+                    <option value="RESPONDENT">Respondent</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="loserPenaltyBps">Loser penalty (%)</label>
+                  <input
+                    id="loserPenaltyBps"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={String(Number(loserPenaltyBps) / 100)}
+                    onChange={(event) =>
+                      setLoserPenaltyBps(String(Math.round(Number(event.target.value || "0") * 100)))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="operatorFeeBps">Operator fee (%)</label>
+                <input
+                  id="operatorFeeBps"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.5"
+                  value={String(Number(operatorFeeBps) / 100)}
+                  onChange={(event) =>
+                    setOperatorFeeBps(String(Math.round(Number(event.target.value || "0") * 100)))
+                  }
                 />
               </div>
               <button
                 className="button"
                 type="button"
-                disabled={busy || isPending || !finalTerms.trim()}
+                disabled={
+                  busy ||
+                  isPending ||
+                  !finalTerms.trim() ||
+                  Number(loserPenaltyBps) + Number(operatorFeeBps) > 10000
+                }
                 onClick={() =>
                   run(() =>
                     onFinalize({
                       caseId: currentDispute.id,
                       finalTerms,
+                      prevailingParty,
+                      loserPenaltyBps: Number(loserPenaltyBps),
+                      operatorFeeBps: Number(operatorFeeBps),
                     }),
                   )
                 }
               >
-                Publish final terms
+                Settle escrow and publish ruling
               </button>
             </div>
           </div>

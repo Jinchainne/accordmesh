@@ -1,4 +1,5 @@
 export type DisputeStage =
+  | "STAKE_PENDING"
   | "RESPONSE_PENDING"
   | "ANALYSIS_READY"
   | "MEDIATION_OPEN"
@@ -7,6 +8,7 @@ export type DisputeStage =
 export type MediationOptionKey = "A" | "B" | "C" | "REJECT";
 export type RoleName = "claimant" | "respondent" | "counsel" | "reviewer" | "regulator";
 export type AppealStatus = "PENDING_REVIEW" | "UPHELD" | "REOPENED" | "MODIFIED_TERMS";
+export type PrevailingParty = "CLAIMANT" | "RESPONDENT";
 
 export type MediationPosition = {
   option: MediationOptionKey;
@@ -24,6 +26,22 @@ export type AppealRecord = {
 };
 
 export type CaseRoles = Record<RoleName, string[]>;
+
+export type EscrowBreakdown = {
+  requiredStakeWei: string;
+  claimantStakeWei: string;
+  respondentStakeWei: string;
+  claimantDeposited: boolean;
+  respondentDeposited: boolean;
+  totalEscrowWei: string;
+  winner: PrevailingParty | "";
+  loserPenaltyBps: number;
+  operatorFeeBps: number;
+  winnerPayoutWei: string;
+  loserRefundWei: string;
+  operatorFeeWei: string;
+  settled: boolean;
+};
 
 export type DisputeRecord = {
   id: string;
@@ -44,6 +62,7 @@ export type DisputeRecord = {
   finalTerms: string;
   roles: CaseRoles;
   appeals: AppealRecord[];
+  escrow: EscrowBreakdown;
 };
 
 export type NewDisputeInput = {
@@ -52,12 +71,17 @@ export type NewDisputeInput = {
   respondent: string;
   claimantStatement: string;
   evidenceUrls: string;
+  stakeAmountGen: string;
 };
 
 export type ResponseInput = {
   caseId: string;
   respondentStatement: string;
   evidenceUrls: string;
+};
+
+export type DepositInput = {
+  caseId: string;
 };
 
 export type MediationInput = {
@@ -69,6 +93,9 @@ export type MediationInput = {
 export type FinalTermsInput = {
   caseId: string;
   finalTerms: string;
+  prevailingParty: PrevailingParty;
+  loserPenaltyBps: number;
+  operatorFeeBps: number;
 };
 
 export type AssignRoleInput = {

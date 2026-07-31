@@ -1,5 +1,6 @@
 import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 import type { Hash } from "genlayer-js/types";
+import { parseEther } from "viem";
 import { appConfig } from "../genlayer/config";
 import { createReadClient, createWriteClient } from "../genlayer/client";
 import { getActiveBrowserProvider } from "../genlayer/wallet";
@@ -7,6 +8,7 @@ import type {
   AppealReviewInput,
   AppealInput,
   AssignRoleInput,
+  DepositInput,
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
@@ -75,6 +77,10 @@ function normalizeRecord(record: Record<string, unknown>): DisputeRecord {
         };
       })
     : [];
+  const escrowRecord =
+    record.escrow && typeof record.escrow === "object" && !Array.isArray(record.escrow)
+      ? (record.escrow as Record<string, unknown>)
+      : {};
 
   return {
     id: String(record.id ?? ""),
@@ -99,6 +105,21 @@ function normalizeRecord(record: Record<string, unknown>): DisputeRecord {
     finalTerms: String(record.final_terms ?? ""),
     roles,
     appeals,
+    escrow: {
+      requiredStakeWei: String(escrowRecord.required_stake_wei ?? "0"),
+      claimantStakeWei: String(escrowRecord.claimant_stake_wei ?? "0"),
+      respondentStakeWei: String(escrowRecord.respondent_stake_wei ?? "0"),
+      claimantDeposited: Boolean(escrowRecord.claimant_deposited),
+      respondentDeposited: Boolean(escrowRecord.respondent_deposited),
+      totalEscrowWei: String(escrowRecord.total_escrow_wei ?? "0"),
+      winner: String(escrowRecord.winner ?? "") as DisputeRecord["escrow"]["winner"],
+      loserPenaltyBps: Number(escrowRecord.loser_penalty_bps ?? 0),
+      operatorFeeBps: Number(escrowRecord.operator_fee_bps ?? 0),
+      winnerPayoutWei: String(escrowRecord.winner_payout_wei ?? "0"),
+      loserRefundWei: String(escrowRecord.loser_refund_wei ?? "0"),
+      operatorFeeWei: String(escrowRecord.operator_fee_wei ?? "0"),
+      settled: Boolean(escrowRecord.settled),
+    },
   };
 }
 
@@ -181,6 +202,7 @@ export class AccordMeshContractClient {
 
   async fileDispute(input: NewDisputeInput, address?: string): Promise<ContractActionResult> {
     const writeClient = await getWriteClient(address);
+    const stakeValue = parseEther(input.stakeAmountGen || "0");
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "file_dispute",
@@ -190,8 +212,26 @@ export class AccordMeshContractClient {
         input.respondent,
         input.claimantStatement,
         input.evidenceUrls,
+        stakeValue,
       ],
-      value: BigInt(0),
+      value: stakeValue,
+    });
+    return waitForReceipt(String(hash));
+  }
+
+  async fundRespondentStake(input: DepositInput, address?: string): Promise<ContractActionResult> {
+    const caseRecord = await this.getCase(input.caseId);
+    if (!caseRecord) {
+      throw new Error("Case not found.");
+    }
+
+    const writeClient = await getWriteClient(address);
+    const requiredStake = BigInt(caseRecord.escrow.requiredStakeWei || "0");
+    const hash = await writeClient.writeContract({
+      address: requireContractAddress(),
+      functionName: "fund_respondent_stake",
+      args: [BigInt(input.caseId)],
+      value: requiredStake,
     });
     return waitForReceipt(String(hash));
   }
@@ -267,7 +307,13 @@ export class AccordMeshContractClient {
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "publish_final_terms",
-      args: [BigInt(input.caseId), input.finalTerms],
+      args: [
+        BigInt(input.caseId),
+        input.finalTerms,
+        input.prevailingParty,
+        BigInt(input.loserPenaltyBps),
+        BigInt(input.operatorFeeBps),
+      ],
       value: BigInt(0),
     });
     return waitForReceipt(String(hash));

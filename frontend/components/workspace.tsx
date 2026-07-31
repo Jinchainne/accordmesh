@@ -30,6 +30,7 @@ import {
   analyzeCase,
   assignRole,
   createDispute,
+  fundRespondentStake,
   loadWorkspaceSnapshot,
   publishFinalTerms,
   recordMediation,
@@ -91,7 +92,9 @@ export function Workspace() {
   const isStudionetReady = chainId.toLowerCase() === "0xf22f";
   const resolvedCount = disputes.filter((item) => item.stage === "RESOLVED").length;
   const appealCount = disputes.reduce((sum, item) => sum + item.appeals.length, 0);
-  const intakeCount = disputes.filter((item) => item.stage === "RESPONSE_PENDING").length;
+  const intakeCount = disputes.filter(
+    (item) => item.stage === "STAKE_PENDING" || item.stage === "RESPONSE_PENDING",
+  ).length;
   const reviewCount = disputes.filter(
     (item) => item.stage === "ANALYSIS_READY" || item.stage === "MEDIATION_OPEN",
   ).length;
@@ -463,6 +466,10 @@ export function Workspace() {
     return runMutation("Submit response", () => submitResponse(input, walletAddress));
   }
 
+  function fundRespondentCaseStake(caseId: string) {
+    return runMutation("Post respondent stake", () => fundRespondentStake({ caseId }, walletAddress));
+  }
+
   function analyzeSelectedCase(caseId: string) {
     return runMutation("Analyze case", () => analyzeCase(caseId, walletAddress));
   }
@@ -684,6 +691,7 @@ export function Workspace() {
                   operator={platformConfig.operator}
                   connectedAddress={walletAddress}
                   busy={isPending}
+                  onFundRespondentStake={fundRespondentCaseStake}
                   onRespond={respondToCase}
                   onAnalyze={analyzeSelectedCase}
                   onMediation={saveMediation}

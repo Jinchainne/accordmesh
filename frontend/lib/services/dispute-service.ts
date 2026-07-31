@@ -10,6 +10,7 @@ import type {
   AppealReviewInput,
   AppealInput,
   AssignRoleInput,
+  DepositInput,
   DisputeRecord,
   FinalTermsInput,
   MediationInput,
@@ -150,11 +151,12 @@ export async function loadWorkspaceSnapshot(): Promise<{
 export async function createDispute(input: NewDisputeInput, actor?: string): Promise<string> {
   if (isMockMode) {
     const claimant = actor ?? "0xClaimant";
+    const requiredStakeWei = String(Math.round(Number(input.stakeAmountGen || "0") * 1_000_000_000_000_000_000));
     const created: DisputeRecord = {
       id: String(Date.now()),
       caseType: input.caseType,
       title: input.title,
-      stage: "RESPONSE_PENDING",
+      stage: "STAKE_PENDING",
       claimant,
       respondent: input.respondent,
       claimantStatement: input.claimantStatement,
@@ -178,6 +180,21 @@ export async function createDispute(input: NewDisputeInput, actor?: string): Pro
         regulator: [],
       },
       appeals: [],
+      escrow: {
+        requiredStakeWei,
+        claimantStakeWei: requiredStakeWei,
+        respondentStakeWei: "0",
+        claimantDeposited: true,
+        respondentDeposited: false,
+        totalEscrowWei: requiredStakeWei,
+        winner: "",
+        loserPenaltyBps: 0,
+        operatorFeeBps: 0,
+        winnerPayoutWei: "0",
+        loserRefundWei: "0",
+        operatorFeeWei: "0",
+        settled: false,
+      },
     };
     mockDisputes.unshift(created);
     saveMockDisputesToStorage();
@@ -185,6 +202,24 @@ export async function createDispute(input: NewDisputeInput, actor?: string): Pro
   }
 
   const result = await contractClient.fileDispute(input, actor);
+  assertSuccessfulExecution(result.executionResultName);
+  return result.hash;
+}
+
+export async function fundRespondentStake(input: DepositInput, actor?: string): Promise<string> {
+  if (isMockMode) {
+    const dispute = requireMockCase(input.caseId);
+    dispute.escrow.respondentStakeWei = dispute.escrow.requiredStakeWei;
+    dispute.escrow.respondentDeposited = true;
+    dispute.escrow.totalEscrowWei = String(
+      BigInt(dispute.escrow.claimantStakeWei) + BigInt(dispute.escrow.respondentStakeWei),
+    );
+    dispute.stage = "RESPONSE_PENDING";
+    saveMockDisputesToStorage();
+    return `mock-respondent-stake-${Date.now()}-${actor ?? "respondent"}`;
+  }
+
+  const result = await contractClient.fundRespondentStake(input, actor);
   assertSuccessfulExecution(result.executionResultName);
   return result.hash;
 }
@@ -313,6 +348,27 @@ export async function publishFinalTerms(input: FinalTermsInput, actor?: string):
     const dispute = requireMockCase(input.caseId);
     dispute.finalTerms = input.finalTerms;
     dispute.stage = "RESOLVED";
+    dispute.escrow.winner = input.prevailingParty;
+    dispute.escrow.loserPenaltyBps = input.loserPenaltyBps;
+    dispute.escrow.operatorFeeBps = input.operatorFeeBps;
+    const claimantStake = BigInt(dispute.escrow.claimantStakeWei);
+    const respondentStake = BigInt(dispute.escrow.respondentStakeWei);
+    const claimantFee = (claimantStake * BigInt(input.operatorFeeBps)) / 10_000n;
+    const respondentFee = (respondentStake * BigInt(input.operatorFeeBps)) / 10_000n;
+    const operatorFee = claimantFee + respondentFee;
+
+    if (input.prevailingParty === "CLAIMANT") {
+      const penalty = (respondentStake * BigInt(input.loserPenaltyBps)) / 10_000n;
+      dispute.escrow.winnerPayoutWei = String(claimantStake - claimantFee + penalty);
+      dispute.escrow.loserRefundWei = String(respondentStake - respondentFee - penalty);
+    } else {
+      const penalty = (claimantStake * BigInt(input.loserPenaltyBps)) / 10_000n;
+      dispute.escrow.winnerPayoutWei = String(respondentStake - respondentFee + penalty);
+      dispute.escrow.loserRefundWei = String(claimantStake - claimantFee - penalty);
+    }
+
+    dispute.escrow.operatorFeeWei = String(operatorFee);
+    dispute.escrow.settled = true;
     saveMockDisputesToStorage();
     return `mock-final-${Date.now()}`;
   }

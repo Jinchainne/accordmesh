@@ -1,5 +1,6 @@
 "use client";
 
+import { formatEther } from "viem";
 import { getCaseReadiness, getStageLabel } from "../lib/domain/derived";
 import type { DisputeRecord } from "../lib/domain/types";
 
@@ -10,6 +11,16 @@ type CaseListProps = {
 };
 
 export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) {
+  function formatGen(wei: string) {
+    try {
+      return `${Number(formatEther(BigInt(wei || "0"))).toLocaleString("en-US", {
+        maximumFractionDigits: 3,
+      })} GEN`;
+    } catch {
+      return "0 GEN";
+    }
+  }
+
   return (
     <section className="table-panel">
       <div className="table-panel-head">
@@ -26,6 +37,7 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
               <th>Title</th>
               <th>Type</th>
               <th>Status</th>
+              <th>Escrow</th>
               <th>Readiness</th>
               <th>Action</th>
             </tr>
@@ -45,6 +57,10 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
                   <td>
                     <span className="badge">{getStageLabel(dispute.stage)}</span>
                   </td>
+                  <td>
+                    <strong>{dispute.escrow.respondentDeposited ? "Funded" : "Awaiting stake"}</strong>
+                    <p>{dispute.escrow.totalEscrowWei === "0" ? "No GEN posted" : formatGen(dispute.escrow.totalEscrowWei)}</p>
+                  </td>
                   <td>{getCaseReadiness(dispute)}%</td>
                   <td>
                     <button className="table-action" type="button" onClick={() => onSelect(dispute.id)}>
@@ -55,7 +71,7 @@ export function CaseList({ disputes, selectedCaseId, onSelect }: CaseListProps) 
               ))
             ) : (
               <tr>
-                <td className="case-table-empty" colSpan={6}>
+                <td className="case-table-empty" colSpan={7}>
                   No disputes have been loaded yet.
                 </td>
               </tr>
