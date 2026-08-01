@@ -5,7 +5,7 @@ const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? defaultContr
 export const appConfig = {
   appName: process.env.NEXT_PUBLIC_APP_NAME ?? "AccordMesh",
   mode: "live",
-  rpcUrl: process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ?? "https://studio.genlayer.com/api",
+  rpcUrl: typeof window !== "undefined" ? "/api/rpc" : (process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ?? "https://studio.genlayer.com/api"),
   contractAddress,
   networkName: process.env.NEXT_PUBLIC_GENLAYER_NETWORK ?? "studionet",
 };
