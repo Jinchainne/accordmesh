@@ -1,22 +1,21 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
-import { AppProviders } from "./providers";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const serif = Cormorant_Garamond({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["500", "600", "700"],
-});
-
-const sans = Manrope({
-  subsets: ["latin"],
-  variable: "--font-ui",
+  variable: "--font-inter",
   weight: ["400", "500", "600", "700", "800"],
 });
 
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "AccordMesh",
+  title: "AccordMesh — Dispute Resolution",
   description: "GenLayer-native dispute casework platform",
 };
 
@@ -26,10 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${serif.variable} ${sans.variable}`}>
-        <AppProviders>{children}</AppProviders>
-      </body>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }
