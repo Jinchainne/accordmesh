@@ -2,7 +2,7 @@ import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 import type { Hash } from "genlayer-js/types";
 import { parseEther } from "viem";
 import { appConfig } from "../genlayer/config";
-import { createReadClient, createWriteClient } from "../genlayer/client";
+import { createReadClient, createWriteClient, withTimeout } from "../genlayer/client";
 import { getActiveBrowserProvider } from "../genlayer/wallet";
 import type {
   AppealReviewInput,
@@ -150,11 +150,11 @@ export class AccordMeshContractClient {
       return null;
     }
 
-    const result = await createReadClient().readContract({
+    const result = await withTimeout(createReadClient().readContract({
       address: requireContractAddress(),
       functionName: "get_platform_config",
       args: [],
-    });
+    }));
 
     if (!result || typeof result !== "object" || Array.isArray(result)) {
       return null;
@@ -173,11 +173,11 @@ export class AccordMeshContractClient {
       return [];
     }
 
-    const result = await createReadClient().readContract({
+    const result = await withTimeout(createReadClient().readContract({
       address: requireContractAddress(),
       functionName: "get_case_ids",
       args: [],
-    });
+    }));
 
     return Array.isArray(result) ? result.map(String) : [];
   }
@@ -187,11 +187,11 @@ export class AccordMeshContractClient {
       return null;
     }
 
-    const rawDocument = await createReadClient().readContract({
+    const rawDocument = await withTimeout(createReadClient().readContract({
       address: requireContractAddress(),
       functionName: "get_case_document",
       args: [BigInt(caseId)],
-    });
+    }));
 
     if (typeof rawDocument !== "string") {
       return null;

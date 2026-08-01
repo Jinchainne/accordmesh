@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { appConfig } from "../lib/genlayer/config";
 import {
   ACCORDMESH_PROVIDER_EVENT,
@@ -83,7 +83,7 @@ export function Workspace() {
   const [transaction, setTransaction] = useState<TransactionState>(idleTransaction);
   const [errorMessage, setErrorMessage] = useState("");
   const [warningMessage, setWarningMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
   const [providerRevision, setProviderRevision] = useState(0);
 
   const selectedDispute = disputes.find((item) => item.id === selectedCaseId) ?? disputes[0] ?? null;
@@ -123,9 +123,8 @@ export function Workspace() {
   }, []);
 
   useEffect(() => {
-    startTransition(async () => {
-      await refreshData();
-    });
+    setIsPending(true);
+    refreshData().finally(() => setIsPending(false));
   }, [refreshData]);
 
   const inspectWallet = useCallback(async () => {
@@ -523,9 +522,8 @@ export function Workspace() {
               className="button secondary sidebar-secondary-button"
               type="button"
               onClick={() => {
-                startTransition(async () => {
-                  await refreshData();
-                });
+                setIsPending(true);
+                refreshData().finally(() => setIsPending(false));
               }}
             >
               Refresh cases

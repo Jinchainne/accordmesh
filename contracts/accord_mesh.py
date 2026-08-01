@@ -177,6 +177,35 @@ class AccordMesh(gl.Contract):
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "ANALYSIS_READY", "INVALID_STAGE"
 
+        # Fetch evidence URLs on-chain
+        all_evidence_urls = case_doc.get("claimant_evidence_urls", []) + case_doc.get("respondent_evidence_urls", [])
+        fetched_evidence: list[dict] = []
+        for url in all_evidence_urls:
+            if isinstance(url, str) and url.strip().startswith("http"):
+                try:
+                    page_text = gl.nondet.web.render(url.strip(), mode="text")
+                    fetched_evidence.append({
+                        "url": url.strip(),
+                        "content": str(page_text)[:3000],
+                        "status": "fetched",
+                    })
+                except Exception as exc:
+                    fetched_evidence.append({
+                        "url": url.strip(),
+                        "content": "",
+                        "status": f"error: {str(exc)[:200]}",
+                    })
+
+        fetched_text = "No evidence URLs were fetched."
+        if fetched_evidence:
+            parts = []
+            for src in fetched_evidence:
+                if src["status"] == "fetched":
+                    parts.append(f"SOURCE [{src['url']}]:\n{src['content']}")
+                else:
+                    parts.append(f"SOURCE [{src['url']}]: FAILED ({src['status']})")
+            fetched_text = "\n\n".join(parts)
+
         prompt = f"""
 You are a neutral dispute analyst for a digital escrow arbitration platform.
 
@@ -194,20 +223,17 @@ BEGIN_RESPONDENT
 {case_doc["respondent_statement"][:4000]}
 END_RESPONDENT
 
-Claimant evidence URLs:
-{json.dumps(case_doc["claimant_evidence_urls"])}
-
-Respondent evidence URLs:
-{json.dumps(case_doc["respondent_evidence_urls"])}
+FETCHED EVIDENCE (independently retrieved on-chain):
+{fetched_text}
 
 Return JSON with exactly these keys:
 {{
   "issue_map": "short bullet-style issue map",
-  "credibility_notes": "brief note on missing facts and competing claims",
+  "credibility_notes": "brief note on missing facts and competing claims, cross-referenced against fetched evidence",
   "settlement_option_a": "practical settlement path A",
   "settlement_option_b": "practical settlement path B",
   "settlement_option_c": "practical settlement path C",
-  "draft_resolution": "neutral draft memo summarizing likely fair resolution and who appears stronger on the current record"
+  "draft_resolution": "neutral draft memo summarizing likely fair resolution grounded in fetched evidence"
 }}
 """
 
