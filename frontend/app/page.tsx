@@ -112,6 +112,51 @@ function stageToFilterMatch(stage: DisputeStage, filter: string): boolean {
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
+function getMockDisputes(): DisputeRecord[] {
+  return [
+    {
+      id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
+      stage: "ANALYSIS_READY" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
+      claimantStatement: "The reentrancy vulnerability in VaultX's withdraw function is severity CRITICAL, not medium as the auditor claims. Funds are at risk.",
+      respondentStatement: "The audit followed standard methodology. The reentrancy guard mitigates the risk to low severity.",
+      claimantEvidenceUrls: ["https://example.com/audit-report.pdf"], respondentEvidenceUrls: ["https://example.com/audit-methodology.md"],
+      issueMap: "1. Severity classification dispute\n2. Reentrancy guard effectiveness\n3. Potential fund exposure",
+      credibilityNotes: "Claimant evidence is stronger: independent audit report confirms CRITICAL severity.",
+      settlementOptions: ["Option A: Immediate patch + partial refund", "Option B: Re-audit with neutral third party", "Option C: Cap liability at 50% of audit fee"],
+      draftResolution: "Based on evidence, the reentrancy vulnerability is confirmed CRITICAL. Recommend partial refund of audit fee.",
+      mediationPositions: {}, finalTerms: "",
+      roles: { claimant: ["0x3637...34bd"], respondent: ["0x9abc...def0"], counsel: [], reviewer: [], regulator: [] },
+      appeals: [], escrow: { requiredStakeWei: "45000000000000000000000", claimantStakeWei: "45000000000000000000000", respondentStakeWei: "45000000000000000000000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "90000000000000000000000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+      adjudication: { verdict: "CLAIMANT_FAVORED", confidence: "high", score: 82, reason: "Independent audit confirms CRITICAL severity. Respondent's methodology defense is insufficient.", evidence_used: ["Audit report", "Reentrancy test results", "VaultX code review"], fetched_sources_summary: ["Fetched audit report confirms CRITICAL finding"] },
+    },
+    {
+      id: "ACD-8819", caseType: "Governance", title: "DAO Treasury Misallocation Claim",
+      stage: "MEDIATION_OPEN" as DisputeStage, claimant: "0x1111...2222", respondent: "0x3333...4444",
+      claimantStatement: "Proposal #44 allocated treasury funds to a project not approved by governance vote.",
+      respondentStatement: "The allocation was within the delegated authority of the treasury committee.",
+      claimantEvidenceUrls: ["https://example.com/proposal-44.pdf"], respondentEvidenceUrls: ["https://example.com/treasury-charter.md"],
+      issueMap: "1. Scope of treasury committee authority\n2. Whether Proposal #44 required governance vote",
+      credibilityNotes: "Both sides present valid constitutional arguments. Charter language is ambiguous.",
+      settlementOptions: ["Option A: Return funds + ratify via governance", "Option B: Partial return + charter amendment", "Option C: Uphold allocation + clarify charter"],
+      draftResolution: "The charter language is ambiguous. Recommend governance ratification vote.",
+      mediationPositions: {}, finalTerms: "",
+      roles: { claimant: ["0x1111...2222"], respondent: ["0x3333...4444"], counsel: [], reviewer: [], regulator: [] },
+      appeals: [], escrow: { requiredStakeWei: "120500000000000000000000", claimantStakeWei: "120500000000000000000000", respondentStakeWei: "120500000000000000000000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "241000000000000000000000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+    },
+    {
+      id: "ACD-8815", caseType: "Data Integrity", title: "Oracle Price Feed Manipulation",
+      stage: "STAKE_PENDING" as DisputeStage, claimant: "0x5555...6666", respondent: "0x7777...8888",
+      claimantStatement: "Abnormal price spikes in the lending protocol were caused by oracle manipulation.",
+      respondentStatement: "The price feed operated correctly within normal market volatility.",
+      claimantEvidenceUrls: [], respondentEvidenceUrls: [],
+      issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
+      mediationPositions: {}, finalTerms: "",
+      roles: { claimant: ["0x5555...6666"], respondent: ["0x7777...8888"], counsel: [], reviewer: [], regulator: [] },
+      appeals: [], escrow: { requiredStakeWei: "8250000000000000000000", claimantStakeWei: "8250000000000000000000", respondentStakeWei: "0", claimantDeposited: true, respondentDeposited: false, totalEscrowWei: "8250000000000000000000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+    },
+  ];
+}
+
 export default function Home() {
   /* ---- wallet state ---- */
   const [walletAddr, setWalletAddr] = useState<string>("");
@@ -215,62 +260,19 @@ export default function Home() {
   const refreshData = useCallback(async () => {
     try {
       setLoading(true);
-      const snapshot = await loadWorkspaceSnapshot();
+      // Race with 8s timeout so mock data appears if RPC hangs
+      const snapshot = await Promise.race([
+        loadWorkspaceSnapshot(),
+        new Promise<{ disputes: DisputeRecord[] }>((_, reject) => setTimeout(() => reject(new Error("RPC timeout")), 8000)),
+      ]);
       if (snapshot.disputes.length > 0) {
         setDisputes(snapshot.disputes);
       } else {
-        // Show mock data so user can see the workflow
-        setDisputes([
-          {
-            id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
-            stage: "ANALYSIS_READY" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
-            claimantStatement: "The reentrancy vulnerability in VaultX's withdraw function is severity CRITICAL, not medium as the auditor claims. Funds are at risk.",
-            respondentStatement: "The audit followed standard methodology. The reentrancy guard mitigates the risk to low severity.",
-            claimantEvidenceUrls: ["https://example.com/audit-report.pdf"], respondentEvidenceUrls: ["https://example.com/audit-methodology.md"],
-            issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
-            mediationPositions: {}, finalTerms: "",
-            roles: { claimant: ["0x3637...34bd"], respondent: ["0x9abc...def0"], counsel: [], reviewer: [], regulator: [] },
-            appeals: [], escrow: { requiredStakeWei: "45000", claimantStakeWei: "45000", respondentStakeWei: "45000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "90000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
-          },
-          {
-            id: "ACD-8819", caseType: "Governance", title: "DAO Treasury Misallocation Claim",
-            stage: "MEDIATION_OPEN" as DisputeStage, claimant: "0x1111...2222", respondent: "0x3333...4444",
-            claimantStatement: "Proposal #44 allocated treasury funds to a project not approved by governance vote.",
-            respondentStatement: "The allocation was within the delegated authority of the treasury committee.",
-            claimantEvidenceUrls: [], respondentEvidenceUrls: [],
-            issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
-            mediationPositions: {}, finalTerms: "",
-            roles: { claimant: ["0x1111...2222"], respondent: ["0x3333...4444"], counsel: [], reviewer: [], regulator: [] },
-            appeals: [], escrow: { requiredStakeWei: "120500", claimantStakeWei: "120500", respondentStakeWei: "120500", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "241000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
-          },
-          {
-            id: "ACD-8815", caseType: "Data Integrity", title: "Oracle Price Feed Manipulation",
-            stage: "STAKE_PENDING" as DisputeStage, claimant: "0x5555...6666", respondent: "0x7777...8888",
-            claimantStatement: "Abnormal price spikes in the lending protocol were caused by oracle manipulation.",
-            respondentStatement: "The price feed operated correctly within normal market volatility.",
-            claimantEvidenceUrls: [], respondentEvidenceUrls: [],
-            issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
-            mediationPositions: {}, finalTerms: "",
-            roles: { claimant: ["0x5555...6666"], respondent: ["0x7777...8888"], counsel: [], reviewer: [], regulator: [] },
-            appeals: [], escrow: { requiredStakeWei: "8250", claimantStakeWei: "8250", respondentStakeWei: "0", claimantDeposited: true, respondentDeposited: false, totalEscrowWei: "8250", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
-          },
-        ]);
+        setDisputes(getMockDisputes());
       }
     } catch (err) {
       console.error("Failed to load data:", err);
-      // Fallback mock data on error
-      setDisputes([
-        {
-          id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
-          stage: "ANALYSIS" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
-          claimantStatement: "The reentrancy vulnerability is CRITICAL.", respondentStatement: "The audit followed standard methodology.",
-          claimantEvidenceUrls: [], respondentEvidenceUrls: [],
-          issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
-          mediationPositions: {}, finalTerms: "",
-          roles: { claimant: [], respondent: [], counsel: [], reviewer: [], regulator: [] },
-          appeals: [], escrow: { requiredStakeWei: "45000", claimantStakeWei: "45000", respondentStakeWei: "45000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "90000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
-        },
-      ]);
+      setDisputes(getMockDisputes());
     } finally {
       setLoading(false);
     }
