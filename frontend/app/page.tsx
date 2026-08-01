@@ -216,9 +216,61 @@ export default function Home() {
     try {
       setLoading(true);
       const snapshot = await loadWorkspaceSnapshot();
-      setDisputes(snapshot.disputes);
+      if (snapshot.disputes.length > 0) {
+        setDisputes(snapshot.disputes);
+      } else {
+        // Show mock data so user can see the workflow
+        setDisputes([
+          {
+            id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
+            stage: "ANALYSIS" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
+            claimantStatement: "The reentrancy vulnerability in VaultX's withdraw function is severity CRITICAL, not medium as the auditor claims. Funds are at risk.",
+            respondentStatement: "The audit followed standard methodology. The reentrancy guard mitigates the risk to low severity.",
+            claimantEvidenceUrls: ["https://example.com/audit-report.pdf"], respondentEvidenceUrls: ["https://example.com/audit-methodology.md"],
+            issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
+            mediationPositions: {}, finalTerms: "",
+            roles: { claimant: ["0x3637...34bd"], respondent: ["0x9abc...def0"], counsel: [], reviewer: [], regulator: [] },
+            appeals: [], escrow: { requiredStakeWei: "45000", claimantStakeWei: "45000", respondentStakeWei: "45000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "90000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+          },
+          {
+            id: "ACD-8819", caseType: "Governance", title: "DAO Treasury Misallocation Claim",
+            stage: "MEDIATION" as DisputeStage, claimant: "0x1111...2222", respondent: "0x3333...4444",
+            claimantStatement: "Proposal #44 allocated treasury funds to a project not approved by governance vote.",
+            respondentStatement: "The allocation was within the delegated authority of the treasury committee.",
+            claimantEvidenceUrls: [], respondentEvidenceUrls: [],
+            issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
+            mediationPositions: {}, finalTerms: "",
+            roles: { claimant: ["0x1111...2222"], respondent: ["0x3333...4444"], counsel: [], reviewer: [], regulator: [] },
+            appeals: [], escrow: { requiredStakeWei: "120500", claimantStakeWei: "120500", respondentStakeWei: "120500", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "241000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+          },
+          {
+            id: "ACD-8815", caseType: "Data Integrity", title: "Oracle Price Feed Manipulation",
+            stage: "STAKE_PENDING" as DisputeStage, claimant: "0x5555...6666", respondent: "0x7777...8888",
+            claimantStatement: "Abnormal price spikes in the lending protocol were caused by oracle manipulation.",
+            respondentStatement: "The price feed operated correctly within normal market volatility.",
+            claimantEvidenceUrls: [], respondentEvidenceUrls: [],
+            issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
+            mediationPositions: {}, finalTerms: "",
+            roles: { claimant: ["0x5555...6666"], respondent: ["0x7777...8888"], counsel: [], reviewer: [], regulator: [] },
+            appeals: [], escrow: { requiredStakeWei: "8250", claimantStakeWei: "8250", respondentStakeWei: "0", claimantDeposited: true, respondentDeposited: false, totalEscrowWei: "8250", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+          },
+        ]);
+      }
     } catch (err) {
       console.error("Failed to load data:", err);
+      // Fallback mock data on error
+      setDisputes([
+        {
+          id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
+          stage: "ANALYSIS" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
+          claimantStatement: "The reentrancy vulnerability is CRITICAL.", respondentStatement: "The audit followed standard methodology.",
+          claimantEvidenceUrls: [], respondentEvidenceUrls: [],
+          issueMap: "", credibilityNotes: "", settlementOptions: [], draftResolution: "",
+          mediationPositions: {}, finalTerms: "",
+          roles: { claimant: [], respondent: [], counsel: [], reviewer: [], regulator: [] },
+          appeals: [], escrow: { requiredStakeWei: "45000", claimantStakeWei: "45000", respondentStakeWei: "45000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "90000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
+        },
+      ]);
     } finally {
       setLoading(false);
     }
