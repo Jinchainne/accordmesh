@@ -22,33 +22,28 @@ import {
   getActiveBrowserProvider,
   setActiveBrowserProvider,
   primeBrowserProviders,
-  getDetectedWalletLabels,
 } from "../lib/genlayer/wallet";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const STUDIONET_CHAIN_ID = "0xf22f"; // 61999
-const STUDIONET_CHAIN_ID_DEC = 61999;
-
-type NavTab = "dashboard" | "cases" | "dispute" | "settlements";
+const STUDIONET_CHAIN_ID = "0xf22f";
 
 const STAGE_LABELS: Record<DisputeStage, string> = {
-  STAKE_PENDING: "Stake Pending",
-  RESPONSE_PENDING: "Response Pending",
-  ANALYSIS_READY: "Analysis Ready",
-  MEDIATION_OPEN: "Mediation Open",
+  STAKE_PENDING: "Open",
+  RESPONSE_PENDING: "Open",
+  ANALYSIS_READY: "Analysis",
+  MEDIATION_OPEN: "Mediation",
   RESOLVED: "Resolved",
 };
 
-const STAGE_ORDER: DisputeStage[] = [
-  "STAKE_PENDING",
-  "RESPONSE_PENDING",
-  "ANALYSIS_READY",
-  "MEDIATION_OPEN",
-  "RESOLVED",
-];
+const STAGE_FILTER_MAP: Record<string, DisputeStage | null> = {
+  "All Stages": null,
+  "Open": "STAKE_PENDING",
+  "Analysis": "ANALYSIS_READY",
+  "Mediation": "MEDIATION_OPEN",
+};
 
 const WORKFLOW_STEPS = [
   { key: "file", label: "File Dispute", stage: "STAKE_PENDING" as DisputeStage },
@@ -64,8 +59,18 @@ const MEDIATION_OPTIONS: { key: MediationOptionKey; label: string; desc: string 
   { key: "A", label: "Option A", desc: "Accept settlement option A" },
   { key: "B", label: "Option B", desc: "Accept settlement option B" },
   { key: "C", label: "Option C", desc: "Accept settlement option C" },
-  { key: "REJECT", label: "Reject", desc: "Reject all options — escalate" },
+  { key: "REJECT", label: "Reject", desc: "Reject all — escalate" },
 ];
+
+const NAV_ITEMS = [
+  { key: "dashboard", icon: "◉", label: "Dashboard" },
+  { key: "cases", icon: "⊞", label: "Case Queue" },
+  { key: "analytics", icon: "◈", label: "Analytics" },
+  { key: "stake", icon: "⬡", label: "Stake GEN" },
+  { key: "settings", icon: "⚙", label: "Settings" },
+] as const;
+
+type NavKey = (typeof NAV_ITEMS)[number]["key"];
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -96,6 +101,13 @@ function getStepIndexForStage(stage: DisputeStage, hasAdjudication: boolean, has
   return 0;
 }
 
+function stageToFilterMatch(stage: DisputeStage, filter: string): boolean {
+  const mapped = STAGE_FILTER_MAP[filter];
+  if (mapped === null || mapped === undefined) return true;
+  if (filter === "Open") return stage === "STAKE_PENDING" || stage === "RESPONSE_PENDING";
+  return stage === mapped;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -104,16 +116,22 @@ export default function Home() {
   /* ---- wallet state ---- */
   const [walletAddr, setWalletAddr] = useState<string>("");
   const [walletChainId, setWalletChainId] = useState<string>("");
-  const [walletError, setWalletError] = useState<string>("");
 
   /* ---- app state ---- */
-  const [activeNav, setActiveNav] = useState<NavTab>("dashboard");
+  const [activeNav, setActiveNav] = useState<NavKey>("cases");
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [txStatus, setTxStatus] = useState<{ phase: "idle" | "pending" | "success" | "error"; label: string; hash?: string; detail?: string }>({ phase: "idle", label: "" });
 
-  /* ---- new dispute form ---- */
+  /* ---- search / filter ---- */
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("All Stages");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 8;
+
+  /* ---- new dispute form (for File Dispute button in sidebar) ---- */
+  const [showFileDispute, setShowFileDispute] = useState(false);
   const [newDispute, setNewDispute] = useState<NewDisputeInput>({
     caseType: "",
     title: "",
@@ -142,29 +160,19 @@ export default function Home() {
   /* ================================================================ */
 
   const connectWallet = useCallback(async () => {
-    setWalletError("");
     try {
       primeBrowserProviders();
       const provider = getActiveBrowserProvider();
-      if (!provider) {
-        setWalletError("No wallet detected. Install MetaMask or OKX Wallet.");
-        return;
-      }
+      if (!provider) return;
 
-      // Request accounts
       const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-      if (!accounts?.length) {
-        setWalletError("No accounts returned. Please unlock your wallet.");
-        return;
-      }
+      if (!accounts?.length) return;
 
-      // Check chain
       const chainId = (await provider.request({ method: "eth_chainId" })) as string;
       setWalletChainId(chainId);
       setWalletAddr(accounts[0]);
       setActiveBrowserProvider(provider);
 
-      // Switch to studionet if needed
       if (chainId !== STUDIONET_CHAIN_ID) {
         try {
           await provider.request({
@@ -173,28 +181,22 @@ export default function Home() {
           });
           setWalletChainId(STUDIONET_CHAIN_ID);
         } catch {
-          // Try adding the chain
           try {
             await provider.request({
               method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: STUDIONET_CHAIN_ID,
-                  chainName: "GenLayer Studio Network",
-                  nativeCurrency: { name: "GEN Token", symbol: "GEN", decimals: 18 },
-                  rpcUrls: ["https://studio.genlayer.com/api"],
-                  blockExplorerUrls: ["https://explorer.genlayer.com"],
-                },
-              ],
+              params: [{
+                chainId: STUDIONET_CHAIN_ID,
+                chainName: "GenLayer Studio Network",
+                nativeCurrency: { name: "GEN Token", symbol: "GEN", decimals: 18 },
+                rpcUrls: ["https://studio.genlayer.com/api"],
+                blockExplorerUrls: ["https://explorer.genlayer.com"],
+              }],
             });
             setWalletChainId(STUDIONET_CHAIN_ID);
-          } catch {
-            setWalletError("Please switch to GenLayer Studionet (chain 61999) manually.");
-          }
+          } catch { /* ignore */ }
         }
       }
 
-      // Listen for changes
       provider.on?.("accountsChanged", (...args: unknown[]) => {
         const accs = args[0] as string[];
         setWalletAddr(accs?.[0] ?? "");
@@ -203,9 +205,7 @@ export default function Home() {
         const cid = args[0] as string;
         setWalletChainId(cid);
       });
-    } catch (err) {
-      setWalletError(err instanceof Error ? err.message : "Wallet connection failed.");
-    }
+    } catch { /* ignore */ }
   }, []);
 
   /* ================================================================ */
@@ -291,9 +291,18 @@ export default function Home() {
   /* ================================================================ */
 
   const selectedCase = disputes.find((d) => d.id === selectedCaseId);
-  const activeCount = disputes.filter((d) => d.stage !== "RESOLVED").length;
-  const totalStaked = disputes.reduce((sum, d) => sum + Number(weiToGen(d.escrow.totalEscrowWei)), 0);
-  const resolvedCount = disputes.filter((d) => d.stage === "RESOLVED").length;
+
+  const filteredDisputes = disputes.filter((d) => {
+    const matchesSearch = !searchQuery ||
+      d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.id.includes(searchQuery) ||
+      d.caseType.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStage = stageToFilterMatch(d.stage, activeFilter);
+    return matchesSearch && matchesStage;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredDisputes.length / PAGE_SIZE));
+  const paginatedDisputes = filteredDisputes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   /* ================================================================ */
   /*  Sidebar                                                          */
@@ -301,21 +310,21 @@ export default function Home() {
 
   const renderSidebar = () => (
     <aside className="app-sidebar">
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-mark">⚖</div>
-        <div className="sidebar-brand-text">
-          <strong>AccordMesh</strong>
-          <span>Dispute Protocol</span>
+      <div>
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">⚖</div>
+          <div className="sidebar-brand-text">
+            <strong>AccordMesh</strong>
+            <span>Decentralized Justice</span>
+          </div>
         </div>
+        <button className="sidebar-file-btn" onClick={() => { setShowFileDispute(true); setActiveNav("cases"); }}>
+          + File a Dispute
+        </button>
       </div>
 
       <nav className="sidebar-nav">
-        {([
-          { key: "dashboard", icon: "◉", label: "Dashboard" },
-          { key: "cases", icon: "⊞", label: "My Cases" },
-          { key: "dispute", icon: "⚑", label: "File Dispute" },
-          { key: "settlements", icon: "✓", label: "Settlements" },
-        ] as { key: NavTab; icon: string; label: string }[]).map((item) => (
+        {NAV_ITEMS.map((item) => (
           <button
             key={item.key}
             className={`sidebar-nav-item ${activeNav === item.key ? "is-active" : ""}`}
@@ -328,6 +337,8 @@ export default function Home() {
       </nav>
 
       <div className="sidebar-footer">
+        <div className="sidebar-footer-link">📄 Documentation</div>
+        <div className="sidebar-footer-link">💬 Support</div>
         <div className="chain-badge">
           <span className="chain-dot" />
           <div className="chain-info">
@@ -343,108 +354,153 @@ export default function Home() {
   /*  Top Bar                                                          */
   /* ================================================================ */
 
-  const renderTopbar = () => {
-    const navLabels: Record<NavTab, { eyebrow: string; heading: string }> = {
-      dashboard: { eyebrow: "Overview", heading: "Platform Dashboard" },
-      cases: { eyebrow: "Casework", heading: "Active Case Queue" },
-      dispute: { eyebrow: "New Case", heading: "File a Dispute" },
-      settlements: { eyebrow: "Resolution", heading: "Settlement Pipeline" },
-    };
-    const { eyebrow, heading } = navLabels[activeNav];
-
-    return (
-      <header className="topbar">
-        <div className="topbar-title">
-          <span className="topbar-eyebrow">{eyebrow}</span>
-          <strong className="topbar-heading">{heading}</strong>
+  const renderTopbar = () => (
+    <header className="topbar">
+      <div className="topbar-links">
+        <span className="topbar-link is-active">Network Status</span>
+        <span className="topbar-link">Governance</span>
+        <span className="topbar-link">Rules</span>
+      </div>
+      <div className="topbar-actions">
+        <button className="topbar-notification">
+          🔔
+          <span className="notif-dot" />
+        </button>
+        {walletAddr ? (
+          <button className="wallet-chip" title={walletAddr}>
+            <span className="wallet-dot" />
+            <span className="wallet-addr">{shortenAddr(walletAddr)}</span>
+          </button>
+        ) : (
+          <button className="btn btn-primary btn-sm" onClick={connectWallet}>
+            Connect Wallet
+          </button>
+        )}
+        <div className="topbar-avatar" title={walletAddr || "Guest"}>
+          {walletAddr ? walletAddr.slice(2, 4).toUpperCase() : "?"}
         </div>
-        <div className="topbar-actions">
-          {walletAddr ? (
-            <button className="wallet-chip" title={walletAddr}>
-              <span className="wallet-dot" />
-              <span className="wallet-addr">{shortenAddr(walletAddr)}</span>
-            </button>
-          ) : (
-            <button className="btn btn-primary btn-sm" onClick={connectWallet}>
-              Connect Wallet
-            </button>
-          )}
-        </div>
-      </header>
-    );
-  };
-
-  /* ================================================================ */
-  /*  Metrics Cards                                                    */
-  /* ================================================================ */
-
-  const renderMetrics = () => (
-    <div className="stats-grid">
-      <div className="stat-card">
-        <span className="stat-label">Active Disputes</span>
-        <strong className="stat-value">{activeCount}</strong>
-        <p className="stat-detail">{disputes.length} total cases</p>
-        <span className="stat-icon">⊞</span>
       </div>
-      <div className="stat-card">
-        <span className="stat-label">Total Staked GEN</span>
-        <strong className="stat-value">{totalStaked.toFixed(2)}</strong>
-        <p className="stat-detail">Across all escrows</p>
-        <span className="stat-icon">◈</span>
-      </div>
-      <div className="stat-card">
-        <span className="stat-label">Resolution Rate</span>
-        <strong className="stat-value">{disputes.length > 0 ? Math.round((resolvedCount / disputes.length) * 100) : 0}%</strong>
-        <p className="stat-detail">{resolvedCount} resolved</p>
-        <span className="stat-icon">✓</span>
-      </div>
-    </div>
+    </header>
   );
 
   /* ================================================================ */
-  /*  Case Queue Table                                                 */
+  /*  Case Queue Page                                                  */
   /* ================================================================ */
 
   const renderCaseQueue = () => (
-    <div className="table-panel">
-      <div className="table-panel-head">
-        <h2>Active Case Queue</h2>
-        <span className="table-count">{disputes.length} cases</span>
+    <div className="dashboard-content">
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="page-header-text">
+          <h1>Active Case Queue</h1>
+          <p>Manage and track all dispute cases across the AccordMesh protocol</p>
+        </div>
+        <button className="btn btn-outline-accent btn-sm" onClick={() => {
+          const csv = ["Case ID,Title,Type,Stage,Staked (GEN)",
+            ...disputes.map(d => `${d.id},"${d.title}",${d.caseType},${d.stage},${weiToGen(d.escrow.totalEscrowWei)}`)
+          ].join("\n");
+          const blob = new Blob([csv], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = "accordmesh-cases.csv"; a.click();
+          URL.revokeObjectURL(url);
+        }}>
+          ↓ Export CSV
+        </button>
       </div>
-      <div className="case-table-wrap">
-        <table className="case-table">
-          <thead>
-            <tr>
-              <th>Case ID</th>
-              <th>Title</th>
-              <th>Type</th>
-              <th>Stage</th>
-              <th>Staked</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {disputes.length === 0 ? (
+
+      {/* Search / Filter Bar */}
+      <div className="filter-bar">
+        <div className="filter-search">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="Search cases by ID, title, or type…"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+          />
+        </div>
+        <div className="filter-tags">
+          {Object.keys(STAGE_FILTER_MAP).map((filter) => (
+            <button
+              key={filter}
+              className={`filter-tag ${activeFilter === filter ? "is-active" : ""}`}
+              onClick={() => { setActiveFilter(filter); setPage(1); }}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+        <button className="filter-advanced">⚙ Advanced</button>
+      </div>
+
+      {/* Case Table */}
+      <div className="table-panel">
+        <div className="case-table-wrap">
+          <table className="case-table">
+            <thead>
               <tr>
-                <td colSpan={6} className="case-table-empty">
-                  {loading ? "Loading cases…" : "No disputes found. File a new case to get started."}
-                </td>
+                <th>CASE ID</th>
+                <th>TITLE & DETAILS</th>
+                <th>TYPE</th>
+                <th>STAGE</th>
+                <th>STAKED (GEN)</th>
               </tr>
-            ) : (
-              disputes.map((d) => (
-                <tr key={d.id} onClick={() => { setSelectedCaseId(d.id); setActiveNav("cases"); }}>
-                  <td><span className="case-id">#{d.id.slice(0, 8)}</span></td>
-                  <td><strong>{d.title || "Untitled"}</strong></td>
-                  <td><span className="text-muted">{d.caseType || "—"}</span></td>
-                  <td><span className={`stage-badge ${d.stage.toLowerCase().replace(/_/g, "-")}`}>{STAGE_LABELS[d.stage]}</span></td>
-                  <td><span className="mono">{weiToGen(d.escrow.totalEscrowWei)} GEN</span></td>
-                  <td><button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setSelectedCaseId(d.id); setActiveNav("cases"); }}>View →</button></td>
+            </thead>
+            <tbody>
+              {paginatedDisputes.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="case-table-empty">
+                    {loading ? "Loading cases…" : "No disputes match your filters. File a new case to get started."}
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                paginatedDisputes.map((d) => (
+                  <tr
+                    key={d.id}
+                    className={d.id === selectedCaseId ? "is-selected" : ""}
+                    onClick={() => setSelectedCaseId(d.id)}
+                  >
+                    <td><span className="case-id">#{d.id.slice(0, 8)}</span></td>
+                    <td>
+                      <strong>{d.title || "Untitled"}</strong>
+                      <p>{d.claimantStatement ? d.claimantStatement.slice(0, 80) + (d.claimantStatement.length > 80 ? "…" : "") : "No statement"}</p>
+                    </td>
+                    <td><span className="case-type-badge">{d.caseType || "—"}</span></td>
+                    <td><span className={`stage-badge ${d.stage.toLowerCase().replace(/_/g, "-")}`}>{STAGE_LABELS[d.stage]}</span></td>
+                    <td><span className="staked-value">{weiToGen(d.escrow.totalEscrowWei)}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {filteredDisputes.length > 0 && (
+          <div className="pagination-bar">
+            <span className="pagination-info">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredDisputes.length)} of {filteredDisputes.length} cases
+            </span>
+            <div className="pagination-controls">
+              <button className="pagination-btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  className={`pagination-btn ${page === i + 1 ? "is-active" : ""}`}
+                  onClick={() => setPage(i + 1)}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button className="pagination-btn" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>›</button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Workflow Stepper */}
+      {renderWorkflow()}
     </div>
   );
 
@@ -460,7 +516,7 @@ export default function Home() {
             <h2>Dispute Workflow</h2>
           </div>
           <div className="step-content">
-            <p className="text-muted">Select a case from the queue or file a new dispute to begin.</p>
+            <p className="text-muted">Select a case from the queue above to view its workflow progress.</p>
           </div>
         </div>
       );
@@ -514,7 +570,7 @@ export default function Home() {
     if (!selectedCase) return null;
 
     switch (stepIdx) {
-      case 0: // File Dispute (already filed if case exists — show info)
+      case 0:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Dispute Filed ✓</h3>
@@ -536,7 +592,7 @@ export default function Home() {
           </div>
         );
 
-      case 1: // Fund Stake
+      case 1:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Step 2: Fund Respondent Stake</h3>
@@ -570,13 +626,11 @@ export default function Home() {
           </div>
         );
 
-      case 2: // Submit Response
+      case 2:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Step 3: Submit Response</h3>
-            <p className="text-muted" style={{ marginBottom: 16 }}>
-              The respondent provides their statement and evidence URLs.
-            </p>
+            <p className="text-muted" style={{ marginBottom: 16 }}>The respondent provides their statement and evidence URLs.</p>
             <div className="form-grid">
               <div className="form-field full-width">
                 <label>Respondent Statement</label>
@@ -606,7 +660,7 @@ export default function Home() {
           </div>
         );
 
-      case 3: // Analyze Case
+      case 3:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Step 4: Analyze Case</h3>
@@ -626,7 +680,7 @@ export default function Home() {
               </div>
             )}
             <div className="action-bar">
-              <span className="text-muted">On-chain AI analysis</span>
+              <span className="text-muted">On-chain AI analysis via gl.nondet.web.render</span>
               <button className="btn btn-accent" onClick={handleAnalyzeCase} disabled={txStatus.phase === "pending"}>
                 Run Analysis
               </button>
@@ -634,14 +688,11 @@ export default function Home() {
           </div>
         );
 
-      case 4: // Adjudicate
+      case 4:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Step 5: Adjudicate</h3>
-            <p className="text-muted" style={{ marginBottom: 16 }}>
-              Leader-validator consensus produces a verdict.
-            </p>
-
+            <p className="text-muted" style={{ marginBottom: 16 }}>Leader-validator consensus produces a verdict.</p>
             {selectedCase.adjudication ? (
               <div className="verdict-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -673,14 +724,11 @@ export default function Home() {
           </div>
         );
 
-      case 5: // Mediation
+      case 5:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Step 6: Mediation</h3>
-            <p className="text-muted" style={{ marginBottom: 16 }}>
-              Parties choose from settlement options or reject.
-            </p>
-
+            <p className="text-muted" style={{ marginBottom: 16 }}>Parties choose from settlement options (A/B/C) or reject.</p>
             {selectedCase.settlementOptions.length > 0 && (
               <div className="form-field" style={{ marginBottom: 16 }}>
                 <label>Available Settlement Options</label>
@@ -702,7 +750,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-
             <div className="form-grid">
               <div className="form-field full-width">
                 <label>Rationale</label>
@@ -713,14 +760,12 @@ export default function Home() {
                 />
               </div>
             </div>
-
-            {/* Show existing positions */}
             {Object.keys(selectedCase.mediationPositions).length > 0 && (
               <div style={{ marginTop: 16 }}>
                 <span className="detail-label">Recorded Positions</span>
                 <div style={{ marginTop: 8 }}>
                   {Object.entries(selectedCase.mediationPositions).map(([addr, pos]) => (
-                    <div key={addr} style={{ padding: "8px 0", borderBottom: "1px solid var(--card-border)", fontSize: 13 }}>
+                    <div key={addr} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
                       <span className="mono text-muted">{shortenAddr(addr)}</span>
                       <span style={{ marginLeft: 12, color: "var(--accent)" }}>→ Option {pos.option}</span>
                       <p style={{ margin: "4px 0 0", color: "var(--muted)" }}>{pos.rationale}</p>
@@ -729,7 +774,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-
             <div className="action-bar">
               <span className="text-muted">Record your mediation position</span>
               <button className="btn btn-primary" onClick={handleMediation} disabled={txStatus.phase === "pending" || !mediationRationale}>
@@ -739,20 +783,16 @@ export default function Home() {
           </div>
         );
 
-      case 6: // Final Terms
+      case 6:
         return (
           <div>
             <h3 style={{ color: "var(--text)", margin: "0 0 8px" }}>Step 7: Final Terms</h3>
-            <p className="text-muted" style={{ marginBottom: 16 }}>
-              Operator resolves the dispute, sets escrow settlement terms.
-            </p>
-
+            <p className="text-muted" style={{ marginBottom: 16 }}>Operator resolves the dispute, escrow is settled, penalty/reward distributed.</p>
             {selectedCase.finalTerms ? (
               <div>
                 <div className="verdict-card">
                   <h3 style={{ margin: "0 0 12px", color: "var(--text)" }}>Resolution Published</h3>
                   <p style={{ color: "var(--text)", fontSize: 14 }}>{selectedCase.finalTerms}</p>
-
                   {selectedCase.escrow.settled && (
                     <div className="escrow-grid" style={{ marginTop: 16 }}>
                       <div className="escrow-item">
@@ -769,7 +809,6 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-
                   {selectedCase.escrow.loserPenaltyBps > 0 && (
                     <p style={{ marginTop: 12, color: "var(--muted)", fontSize: 13 }}>
                       Penalty: {selectedCase.escrow.loserPenaltyBps / 100}% from loser → winner. Operator fee: {selectedCase.escrow.operatorFeeBps / 100}%.
@@ -803,7 +842,7 @@ export default function Home() {
                       onChange={(e) => setLoserPenaltyBps(Number(e.target.value))}
                       className="mono-input"
                     />
-                    <span className="input-hint">{loserPenaltyBps / 100}% of loser's stake goes to winner</span>
+                    <span className="input-hint">{loserPenaltyBps / 100}% of loser&apos;s stake goes to winner</span>
                   </div>
                 </div>
                 <div className="form-row">
@@ -835,102 +874,63 @@ export default function Home() {
   };
 
   /* ================================================================ */
-  /*  File Dispute View                                                */
+  /*  File Dispute Modal / Overlay                                     */
   /* ================================================================ */
 
-  const renderFileDispute = () => (
-    <div>
-      <div className="section-header">
-        <div>
-          <h1>File a New Dispute</h1>
-          <p>Submit a new case to the AccordMesh dispute resolution system. A claimant stake is required.</p>
-        </div>
-      </div>
-
-      <div className="workflow-panel">
-        <div className="step-content">
-          <div className="form-grid">
-            <div className="form-row">
-              <div className="form-field">
-                <label>Case Type</label>
-                <input
-                  type="text"
-                  value={newDispute.caseType}
-                  onChange={(e) => setNewDispute({ ...newDispute, caseType: e.target.value })}
-                  placeholder="e.g., Contract Breach, IP Dispute"
-                />
+  const renderFileDisputeOverlay = () => {
+    if (!showFileDispute) return null;
+    return (
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 100,
+        background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center",
+        backdropFilter: "blur(4px)"
+      }} onClick={() => setShowFileDispute(false)}>
+        <div className="workflow-panel" style={{ width: "90%", maxWidth: 640, maxHeight: "85vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+          <div className="workflow-panel-head">
+            <h2>File a New Dispute</h2>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowFileDispute(false)}>✕</button>
+          </div>
+          <div className="step-content">
+            <div className="form-grid">
+              <div className="form-row">
+                <div className="form-field">
+                  <label>Case Type</label>
+                  <input type="text" value={newDispute.caseType} onChange={(e) => setNewDispute({ ...newDispute, caseType: e.target.value })} placeholder="e.g., Contract Breach" />
+                </div>
+                <div className="form-field">
+                  <label>Stake Amount (GEN)</label>
+                  <input type="text" value={newDispute.stakeAmountGen} onChange={(e) => setNewDispute({ ...newDispute, stakeAmountGen: e.target.value })} placeholder="0.1" className="mono-input" />
+                </div>
               </div>
               <div className="form-field">
-                <label>Stake Amount (GEN)</label>
-                <input
-                  type="text"
-                  value={newDispute.stakeAmountGen}
-                  onChange={(e) => setNewDispute({ ...newDispute, stakeAmountGen: e.target.value })}
-                  placeholder="0.1"
-                  className="mono-input"
-                />
+                <label>Case Title</label>
+                <input type="text" value={newDispute.title} onChange={(e) => setNewDispute({ ...newDispute, title: e.target.value })} placeholder="Brief description of the dispute" />
               </div>
-            </div>
-
-            <div className="form-field">
-              <label>Case Title</label>
-              <input
-                type="text"
-                value={newDispute.title}
-                onChange={(e) => setNewDispute({ ...newDispute, title: e.target.value })}
-                placeholder="Brief description of the dispute"
-              />
-            </div>
-
-            <div className="form-field">
-              <label>Respondent Address</label>
-              <input
-                type="text"
-                value={newDispute.respondent}
-                onChange={(e) => setNewDispute({ ...newDispute, respondent: e.target.value })}
-                placeholder="0x…"
-                className="mono-input"
-              />
-            </div>
-
-            <div className="form-field">
-              <label>Claimant Statement</label>
-              <textarea
-                value={newDispute.claimantStatement}
-                onChange={(e) => setNewDispute({ ...newDispute, claimantStatement: e.target.value })}
-                placeholder="Describe your claim in detail…"
-              />
-            </div>
-
-            <div className="form-field">
-              <label>Evidence URLs (comma-separated)</label>
-              <input
-                type="text"
-                value={newDispute.evidenceUrls}
-                onChange={(e) => setNewDispute({ ...newDispute, evidenceUrls: e.target.value })}
-                placeholder="https://example.com/evidence1.pdf, https://example.com/evidence2.png"
-                className="mono-input"
-              />
-            </div>
-
-            {txStatus.phase !== "idle" && (
-              <div className={`tx-status ${txStatus.phase}`}>
-                {txStatus.phase === "pending" && <span className="spinner" />}
-                <span>{txStatus.label}</span>
-                {txStatus.hash && <span className="tx-hash">{shortenAddr(txStatus.hash)}</span>}
-                {txStatus.detail && <span>{txStatus.detail}</span>}
+              <div className="form-field">
+                <label>Respondent Address</label>
+                <input type="text" value={newDispute.respondent} onChange={(e) => setNewDispute({ ...newDispute, respondent: e.target.value })} placeholder="0x…" className="mono-input" />
               </div>
-            )}
-
-            <div className="action-bar">
-              <span className="text-muted">Requires wallet connection &amp; GEN stake</span>
-              <div className="action-bar-right">
-                <button className="btn btn-secondary" onClick={() => setActiveNav("dashboard")}>
-                  Cancel
-                </button>
+              <div className="form-field">
+                <label>Claimant Statement</label>
+                <textarea value={newDispute.claimantStatement} onChange={(e) => setNewDispute({ ...newDispute, claimantStatement: e.target.value })} placeholder="Describe your claim in detail…" />
+              </div>
+              <div className="form-field">
+                <label>Evidence URLs (comma-separated)</label>
+                <input type="text" value={newDispute.evidenceUrls} onChange={(e) => setNewDispute({ ...newDispute, evidenceUrls: e.target.value })} placeholder="https://example.com/evidence1.pdf" className="mono-input" />
+              </div>
+              {txStatus.phase !== "idle" && (
+                <div className={`tx-status ${txStatus.phase}`}>
+                  {txStatus.phase === "pending" && <span className="spinner" />}
+                  <span>{txStatus.label}</span>
+                  {txStatus.hash && <span className="tx-hash">{shortenAddr(txStatus.hash)}</span>}
+                  {txStatus.detail && <span>{txStatus.detail}</span>}
+                </div>
+              )}
+              <div className="action-bar">
+                <span className="text-muted">Requires wallet connection &amp; GEN stake</span>
                 <button
                   className="btn btn-primary"
-                  onClick={handleFileDispute}
+                  onClick={() => { handleFileDispute(); }}
                   disabled={txStatus.phase === "pending" || !walletAddr || !newDispute.title || !newDispute.respondent}
                 >
                   {txStatus.phase === "pending" ? "Filing…" : "File Dispute & Stake"}
@@ -940,116 +940,7 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </div>
-  );
-
-  /* ================================================================ */
-  /*  Settlements View                                                 */
-  /* ================================================================ */
-
-  const renderSettlements = () => {
-    const resolvedCases = disputes.filter((d) => d.stage === "RESOLVED");
-    return (
-      <div>
-        <div className="section-header">
-          <div>
-            <h1>Settlements</h1>
-            <p>View resolved disputes and escrow settlements.</p>
-          </div>
-        </div>
-
-        {resolvedCases.length === 0 ? (
-          <div className="workflow-panel">
-            <div className="step-content">
-              <p className="text-muted">No resolved disputes yet.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="table-panel">
-            <div className="table-panel-head">
-              <h2>Resolved Cases</h2>
-              <span className="table-count">{resolvedCases.length}</span>
-            </div>
-            <div className="case-table-wrap">
-              <table className="case-table">
-                <thead>
-                  <tr>
-                    <th>Case ID</th>
-                    <th>Title</th>
-                    <th>Winner</th>
-                    <th>Payout</th>
-                    <th>Penalty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resolvedCases.map((d) => (
-                    <tr key={d.id} onClick={() => { setSelectedCaseId(d.id); setActiveNav("cases"); }}>
-                      <td><span className="case-id">#{d.id.slice(0, 8)}</span></td>
-                      <td><strong>{d.title || "Untitled"}</strong></td>
-                      <td><span className="text-accent">{d.escrow.winner || "—"}</span></td>
-                      <td><span className="mono">{weiToGen(d.escrow.winnerPayoutWei)} GEN</span></td>
-                      <td><span className="mono">{d.escrow.loserPenaltyBps / 100}%</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
     );
-  };
-
-  /* ================================================================ */
-  /*  Main Content Router                                              */
-  /* ================================================================ */
-
-  const renderContent = () => {
-    switch (activeNav) {
-      case "dashboard":
-        return (
-          <div className="dashboard-content">
-            <div className="section-header">
-              <div>
-                <h1>AccordMesh</h1>
-                <p>GenLayer-native decentralized dispute resolution platform</p>
-              </div>
-              {!walletAddr && (
-                <button className="btn btn-primary" onClick={connectWallet}>
-                  Connect Wallet
-                </button>
-              )}
-            </div>
-            {walletError && (
-              <div className="tx-status error">{walletError}</div>
-            )}
-            {renderMetrics()}
-            {renderCaseQueue()}
-          </div>
-        );
-
-      case "cases":
-        return (
-          <div className="dashboard-content">
-            {renderCaseQueue()}
-            {renderWorkflow()}
-          </div>
-        );
-
-      case "dispute":
-        return (
-          <div className="dashboard-content">
-            {renderFileDispute()}
-          </div>
-        );
-
-      case "settlements":
-        return (
-          <div className="dashboard-content">
-            {renderSettlements()}
-          </div>
-        );
-    }
   };
 
   /* ================================================================ */
@@ -1059,10 +950,11 @@ export default function Home() {
   return (
     <div className="dashboard-frame">
       {renderSidebar()}
-      <main className="dashboard-main">
+      <div className="dashboard-main">
         {renderTopbar()}
-        {renderContent()}
-      </main>
+        {renderCaseQueue()}
+      </div>
+      {renderFileDisputeOverlay()}
     </div>
   );
 }

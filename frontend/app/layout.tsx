@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AccordMesh — Dispute Resolution",
-  description: "GenLayer-native dispute casework platform",
+  title: "AccordMesh — Cybernetic Law Lab",
+  description: "Decentralized dispute resolution on GenLayer — AI-powered adjudication, mediation, and escrow settlement",
 };
 
 export default function RootLayout({
