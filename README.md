@@ -1,176 +1,152 @@
 # AccordMesh
 
-AccordMesh is a GenLayer-native dispute casework platform focused on intake, bilateral GEN escrow, evidence organization, mediation, and resolution drafting.
+Bilateral escrow dispute resolution on GenLayer — AI-powered adjudication, mediation, and escrow settlement.
 
-Live deployment:
+**Live:** https://accordmesh.vercel.app/  
+**Contract:** `0xf7F8b355543cE3730264e338039da1bA148420C3` (Studionet 61999)
 
-- Frontend: https://accordmesh.vercel.app
-- Studionet contract: `0x4f4EdcAf1d8Fe65523aB0FEb92F79D17Cc9140FE`
+## How It Works
 
-This repo is intentionally designed to be structurally and conceptually different from verdict-and-betting dispute apps. The MVP centers on phased casework:
-
-1. Claimant files a dispute and posts GEN stake
-2. Respondent matches the GEN stake to contest the claim
-3. Respondent response collection
-4. AI-generated issue map and mediation options
-5. Resolution memo drafting and escrow settlement
-
-## Architecture
-
-- `contracts/accord_mesh.py`
-  - GenLayer Intelligent Contract
-  - Stores dispute records as serialized case documents
-  - Enforces the dispute + escrow state machine
-  - Holds bilateral GEN stake and settles payout on operator ruling
-  - Runs AI analysis for issue mapping and settlement options
-- `frontend/`
-  - Next.js App Router frontend
-  - Includes wallet connection, intake, response, analysis, mediation, and final-terms flows
-  - Supports both `mock` mode and live GenLayer interaction through `genlayer-js`
-- `deploy/`
-  - Simple deployment helper for Studionet / GenLayer Studio
-- `docs/architecture.md`
-  - Domain model and workflow rationale
-
-## Why this is different
-
-AccordMesh is not a token betting market and not an "AI criminal court."
-
-The product models a real dispute workflow more like legal operations:
-
-- structured claim intake
-- evidence normalization
-- issue spotting
-- mediation options
-- resolution memo generation
-
-## Originality boundary
-
-This project is built as a separate product concept with:
-
-- a different product thesis
-- a different contract model
-- a different workflow
-- different seed data
-- different interface copy
-- no imported assets, content, or repository data from earlier examples
-
-## MVP workflow
-
-1. Claimant files a dispute with type, title, narrative, evidence links, and matching GEN stake
-2. Respondent matches the required GEN stake and submits a response with supporting links
-3. Anyone authorized to operate the case runs AI analysis
-4. The contract stores:
-   - issue map
-   - credibility notes
-   - three settlement options
-   - a draft resolution memo
-5. Parties can record their mediation position
-6. Operator settles the dispute by choosing the prevailing side, loser penalty, and operator fee
-7. Case is marked resolved once the final terms and payout split are published
-
-## Current project status
-
-This repo now includes:
-
-- a deployable GenLayer Intelligent Contract
-- a client-side Next.js workspace
-- browser wallet connection for signed writes
-- read + write integration through the official `genlayer-js` SDK
-- mock mode for UI iteration before deployment
-- live mode for Studionet once a contract address is configured
-- a regulatory submission packet export for post-resolution reporting
-- evidence upload routes for IPFS via Pinata and Google Drive via service account
-- role assignment for counsel, reviewer, and regulator
-- appeal filing and appeal review workflows
-- PDF-ready decision memo output
-- claimant/respondent bilateral GEN escrow
-- winner/loser/operator payout settlement logic
-
-## GenLayer network notes
-
-According to the current GenLayer docs, `studionet` is the hosted development environment and the contract can be deployed directly with:
-
-```powershell
-genlayer deploy --contract contracts/accord_mesh.py
+```
+Buyer files dispute  →  Seller matches escrow  →  AI analyzes evidence  →  Adjudicate  →  Mediate  →  Final Terms
++ deposits GEN            + deposits GEN            (on-chain fetch)         (consensus)     (A/B/C)     (settlement)
 ```
 
-GenLayer also documents direct deployment to `https://studio.genlayer.com/api` for Studionet.
+### 1. File Dispute (Claimant) — `@gl.public.write.payable`
+- Files a dispute with case type, title, respondent, statement, and evidence URLs
+- **Sends real GEN as escrow** via `gl.message.value`
 
-## Quick start
+### 2. Fund Stake (Respondent) — `@gl.public.write.payable`
+- Respondent deposits matching GEN escrow
+- Dispute moves to RESPONSE_PENDING
 
-### 1. Install prerequisites
+### 3. Submit Response — `@gl.public.write`
+- Respondent submits defense statement and evidence URLs
+- Dispute moves to ANALYSIS_READY
 
-- Node.js 18+
-- Python 3.12+
-- GenLayer CLI
+### 4. Analyze Case — `@gl.public.write`
+- AI fetches evidence URLs from both parties on-chain via `gl.nondet.web.render()`
+- Generates issue map, credibility notes, settlement options, draft resolution
+- Uses `gl.eq_principle.strict_eq` consensus
+- Dispute moves to MEDIATION_OPEN
 
-```powershell
-npm install -g genlayer
+### 5. Adjudicate — `@gl.public.write`
+- **Leader-validator consensus** via `gl.vm.run_nondet_unsafe()`
+- Both nodes independently fetch evidence and evaluate
+- Consensus: verdict exact match, score ±20, confidence ±1 rank
+- Produces verdict: `CLAIMANT_FAVORED` / `RESPONDENT_FAVORED` / `SPLIT` / `UNDERTERMINED`
+
+### 6. Mediation — `@gl.public.write`
+- Both parties choose: Option A, B, C, or REJECT
+- Positions recorded on-chain
+
+### 7. Final Terms — `@gl.public.write`
+- Operator resolves dispute
+- **Requires adjudication before finalizing**
+- Escrow settlement via `emit_transfer`:
+  - Winner gets their stake + penalty from loser
+  - Loser gets their stake minus penalty
+  - Operator fee deducted from both sides
+
+## Contract Functions
+
+### Write (payable — sends GEN)
+| Function | Description |
+|----------|-------------|
+| `file_dispute(type, title, respondent, statement, evidence_csv, stake)` | Claimant files dispute + deposits escrow |
+| `fund_respondent_stake(case_id)` | Respondent matches escrow |
+
+### Write (no value)
+| Function | Description |
+|----------|-------------|
+| `submit_response(case_id, statement, evidence_csv)` | Respondent submits defense |
+| `analyze_case(case_id)` | AI analysis with on-chain evidence fetching |
+| `adjudicate_dispute(case_id)` | Leader-validator consensus verdict |
+| `record_mediation_position(case_id, option, rationale)` | Party mediation choice |
+| `publish_final_terms(case_id, terms, party, penalty, fee)` | Operator resolves + settles escrow |
+| `submit_appeal(case_id, action, rationale, evidence_csv)` | Appeal with new evidence |
+| `review_appeal(case_id, index, disposition, memo)` | Reviewer decides appeal |
+
+### Read (view)
+| Function | Description |
+|----------|-------------|
+| `get_case_document(case_id)` | Get full case JSON |
+| `get_case_ids()` | List all case IDs |
+| `get_case_count()` | Total cases |
+| `get_platform_config()` | Platform name, rules, operator |
+
+## Contract Architecture
+
+```python
+# GenLayer Intelligent Contract (Python)
+class AccordMesh(gl.Contract):
+    platform_name: str
+    rules_uri: str
+    operator: Address
+    next_case_id: u256
+    case_ids: DynArray[u256]
+    cases: TreeMap[u256, str]
+    # Key patterns:
+    # - gl.nondet.web.render() for evidence fetching
+    # - gl.nondet.exec_prompt() for AI analysis
+    # - gl.eq_principle.strict_eq() for analysis consensus
+    # - gl.vm.run_nondet_unsafe() for leader-validator adjudication
+    # - Address.emit_transfer() for escrow settlement
 ```
 
-### 2. Install frontend dependencies
+## Frontend
 
-```powershell
-cd frontend
-npm install
-```
+- **Next.js** + React + TypeScript + Tailwind CSS
+- Dark-mode "Cybernetic Law Lab" design
+- Case queue with search and stage filters (All Stages, Open, Analysis, Mediation)
+- 7-step workflow stepper
+- RPC proxy (`/api/rpc`) for CORS bypass
+- Wallet connection: OKX / MetaMask via `window.ethereum`
+- Studionet chain (0xf22f / 61999)
 
-### 3. Configure the frontend
+## Quick Start
 
-```powershell
-Copy-Item .env.example .env.local
-```
+```bash
+# Install
+cd frontend && npm install
 
-Set:
-
-- `NEXT_PUBLIC_GENLAYER_RPC_URL`
-- `NEXT_PUBLIC_GENLAYER_NETWORK`
-- `NEXT_PUBLIC_CONTRACT_ADDRESS`
-- `NEXT_PUBLIC_APP_MODE`
-
-Use:
-
-- `NEXT_PUBLIC_APP_MODE=mock` while designing locally
-- `NEXT_PUBLIC_APP_MODE=live` after deploying the contract
-
-### 4. Run the app
-
-```powershell
-cd frontend
+# Run dev
 npm run dev
-```
 
-### 5. Deploy the contract
+# Build
+npm run build
 
-```powershell
+# Deploy contract
 genlayer deploy --contract contracts/accord_mesh.py --args "AccordMesh" "ipfs://community-rules"
 ```
 
-Then paste the deployed contract address into `frontend/.env.local`:
+## Project Structure
 
-```powershell
-NEXT_PUBLIC_APP_MODE=live
-NEXT_PUBLIC_GENLAYER_NETWORK=studionet
-NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
-NEXT_PUBLIC_CONTRACT_ADDRESS=0x...
+```
+├── contracts/
+│   └── accord_mesh.py           # GenLayer Intelligent Contract
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx             # Main dashboard component
+│   │   ├── globals.css          # Dark-mode styles
+│   │   ├── layout.tsx           # Root layout
+│   │   └── api/rpc/route.ts     # RPC proxy for CORS
+│   ├── lib/
+│   │   ├── contracts/accordMesh.ts   # Contract client
+│   │   ├── genlayer/client.ts        # GenLayer RPC client
+│   │   ├── genlayer/config.ts        # Chain config
+│   │   └── services/dispute-service.ts
+│   └── components/
+├── deploy/
+├── vercel.json
+└── README.md
 ```
 
-### 6. Connect wallet in the browser
+## Why GenLayer?
 
-The frontend uses the official GenLayer SDK pattern documented by GenLayer:
-
-- a read client pointed at the RPC
-- a write client signed by the browser wallet
-- `client.connect("studionet")` to switch MetaMask to the correct chain before sending transactions
-
-Official references:
-
-- GenLayer JS SDK: https://docs.genlayer.com/api-references/genlayer-js
-- Writing to Intelligent Contracts: https://docs.genlayer.com/developers/decentralized-applications/writing-data
-- Network configuration: https://docs.genlayer.com/developers/intelligent-contracts/deploying/network-configuration
-
-## Production notes
-
-- The live Studionet contract deployed on July 31, 2026 is `0x4f4EdcAf1d8Fe65523aB0FEb92F79D17Cc9140FE`.
-- Frontend fallback config now points to this contract by default.
+This project **cannot work without GenLayer**:
+- AI must fetch and analyze real evidence on-chain (`gl.nondet.web.render`)
+- No single entity should decide a dispute alone (leader-validator consensus)
+- Real GEN escrow creates financial incentive for honest participation
+- `emit_transfer` provides trustless settlement without intermediaries
+- Bilateral escrow ensures both parties have skin in the game
