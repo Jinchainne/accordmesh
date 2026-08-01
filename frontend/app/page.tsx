@@ -50,7 +50,7 @@ const WORKFLOW_STEPS = [
   { key: "fund", label: "Fund Stake", stage: "STAKE_PENDING" as DisputeStage },
   { key: "respond", label: "Submit Response", stage: "RESPONSE_PENDING" as DisputeStage },
   { key: "analyze", label: "Analyze Case", stage: "ANALYSIS_READY" as DisputeStage },
-  { key: "adjudicate", label: "Adjudicate", stage: "ANALYSIS_READY" as DisputeStage },
+  { key: "adjudicate", label: "Adjudicate", stage: "MEDIATION_OPEN" as DisputeStage },
   { key: "mediate", label: "Mediation", stage: "MEDIATION_OPEN" as DisputeStage },
   { key: "final", label: "Final Terms", stage: "MEDIATION_OPEN" as DisputeStage },
 ];
@@ -94,7 +94,7 @@ function weiToGen(wei: string): string {
 function getStepIndexForStage(stage: DisputeStage, hasAdjudication: boolean, hasFinalTerms: boolean): number {
   if (hasFinalTerms) return 6;
   if (stage === "MEDIATION_OPEN" && hasAdjudication) return 5;
-  if (stage === "ANALYSIS_READY" && hasAdjudication) return 4;
+  if (stage === "MEDIATION_OPEN") return 4;
   if (stage === "ANALYSIS_READY") return 3;
   if (stage === "RESPONSE_PENDING") return 2;
   if (stage === "STAKE_PENDING") return 1;
