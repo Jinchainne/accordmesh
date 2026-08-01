@@ -102,6 +102,14 @@ function normalizeRecord(record: Record<string, unknown>): DisputeRecord {
     ].filter(Boolean),
     draftResolution: String(record.draft_resolution ?? ""),
     mediationPositions,
+    adjudication: record.adjudication ? {
+      verdict: String((record.adjudication as Record<string, unknown>).verdict ?? ""),
+      confidence: String((record.adjudication as Record<string, unknown>).confidence ?? ""),
+      score: Number((record.adjudication as Record<string, unknown>).score ?? 0),
+      reason: String((record.adjudication as Record<string, unknown>).reason ?? ""),
+      evidence_used: Array.isArray((record.adjudication as Record<string, unknown>).evidence_used) ? ((record.adjudication as Record<string, unknown>).evidence_used as unknown[]).map(String) : [],
+      fetched_sources_summary: Array.isArray((record.adjudication as Record<string, unknown>).fetched_sources_summary) ? ((record.adjudication as Record<string, unknown>).fetched_sources_summary as unknown[]).map(String) : [],
+    } : undefined,
     finalTerms: String(record.final_terms ?? ""),
     roles,
     appeals,
@@ -252,6 +260,17 @@ export class AccordMeshContractClient {
     const hash = await writeClient.writeContract({
       address: requireContractAddress(),
       functionName: "analyze_case",
+      args: [BigInt(caseId)],
+      value: BigInt(0),
+    });
+    return waitForReceipt(String(hash));
+  }
+
+  async adjudicateDispute(caseId: string, address?: string): Promise<ContractActionResult> {
+    const writeClient = await getWriteClient(address);
+    const hash = await writeClient.writeContract({
+      address: requireContractAddress(),
+      functionName: "adjudicate_dispute",
       args: [BigInt(caseId)],
       value: BigInt(0),
     });

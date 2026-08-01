@@ -28,6 +28,7 @@ import type {
 } from "../lib/domain/types";
 import {
   analyzeCase,
+  adjudicateDispute,
   assignRole,
   createDispute,
   fundRespondentStake,
@@ -473,6 +474,10 @@ export function Workspace() {
     return runMutation("Analyze case", () => analyzeCase(caseId, walletAddress));
   }
 
+  function adjudicateSelectedCase(caseId: string) {
+    return runMutation("Adjudicate dispute", () => adjudicateDispute(caseId, walletAddress));
+  }
+
   function saveMediation(input: MediationInput) {
     return runMutation("Record mediation position", () => recordMediation(input, walletAddress));
   }
@@ -692,6 +697,7 @@ export function Workspace() {
                   onFundRespondentStake={fundRespondentCaseStake}
                   onRespond={respondToCase}
                   onAnalyze={analyzeSelectedCase}
+                  onAdjudicate={adjudicateSelectedCase}
                   onMediation={saveMediation}
                   onFinalize={finalizeCase}
                   onAssignRole={assignSpecialist}

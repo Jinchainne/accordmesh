@@ -266,6 +266,26 @@ export async function analyzeCase(caseId: string, actor?: string): Promise<strin
   return result.hash;
 }
 
+export async function adjudicateDispute(caseId: string, actor?: string): Promise<string> {
+  if (isMockMode) {
+    const dispute = requireMockCase(caseId);
+    dispute.adjudication = {
+      verdict: "CLAIMANT_FAVORED",
+      confidence: "high",
+      score: 78,
+      reason: "Mock adjudication: claimant evidence is stronger based on fetched sources.",
+      evidence_used: ["Buyer unpacking photos", "Payment confirmation", "Delivery timestamp"],
+      fetched_sources_summary: ["Fetched claimant evidence confirms missing items claim"],
+    };
+    saveMockDisputesToStorage();
+    return `mock-adjudication-${Date.now()}`;
+  }
+
+  const result = await contractClient.adjudicateDispute(caseId, actor);
+  assertSuccessfulExecution(result.executionResultName);
+  return result.hash;
+}
+
 export async function recordMediation(input: MediationInput, actor?: string): Promise<string> {
   if (isMockMode) {
     const dispute = requireMockCase(input.caseId);

@@ -26,6 +26,7 @@ type CaseDetailProps = {
   onFundRespondentStake(caseId: string): Promise<void>;
   onRespond(input: ResponseInput): Promise<void>;
   onAnalyze(caseId: string): Promise<void>;
+  onAdjudicate(caseId: string): Promise<void>;
   onMediation(input: MediationInput): Promise<void>;
   onFinalize(input: FinalTermsInput): Promise<void>;
   onAssignRole(input: AssignRoleInput): Promise<void>;
@@ -113,6 +114,7 @@ export function CaseDetail({
   onFundRespondentStake,
   onRespond,
   onAnalyze,
+  onAdjudicate,
   onMediation,
   onFinalize,
   onAssignRole,
@@ -709,6 +711,24 @@ export function CaseDetail({
               onClick={() => run(() => onAnalyze(currentDispute.id))}
             >
               Analyze case
+            </button>
+          </div>
+        ) : null}
+
+        {currentDispute.stage === "MEDIATION_OPEN" ? (
+          <div className="stage-card">
+            <strong>Adjudicate Dispute</strong>
+            <p>
+              Run leader-validator consensus to produce a binding verdict.
+              Both nodes independently fetch evidence and evaluate the case.
+            </p>
+            <button
+              className="button"
+              type="button"
+              disabled={busy || isPending || current === ""}
+              onClick={() => run(() => onAdjudicate(currentDispute.id))}
+            >
+              Run Adjudication
             </button>
           </div>
         ) : null}

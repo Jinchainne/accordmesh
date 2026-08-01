@@ -32,18 +32,39 @@ class AccordMesh(gl.Contract):
     def _has_access(self, case_doc: dict, sender_hex: str) -> bool:
         if sender_hex == case_doc["claimant"] or sender_hex == case_doc["respondent"]:
             return True
-
         for role_name in ["counsel", "reviewer", "regulator"]:
             if sender_hex in case_doc["roles"][role_name]:
                 return True
-
         return False
 
     def _send_gen(self, recipient_hex: str, amount: int) -> None:
         if amount <= 0:
             return
-
         _Recipient(Address(recipient_hex)).emit_transfer(value=u256(amount), on="finalized")
+
+    def _fetch_urls(self, urls: list[str]) -> list[dict]:
+        fetched: list[dict] = []
+        for url in urls:
+            if isinstance(url, str) and url.strip().startswith("http"):
+                try:
+                    page_text = gl.nondet.web.render(url.strip(), mode="text")
+                    fetched.append({"url": url.strip(), "content": str(page_text)[:3000], "status": "fetched"})
+                except Exception as exc:
+                    fetched.append({"url": url.strip(), "content": "", "status": f"error: {str(exc)[:200]}"})
+        return fetched
+
+    def _format_fetched(self, fetched: list[dict]) -> str:
+        if not fetched:
+            return "No sources fetched."
+        parts = []
+        for src in fetched:
+            if src["status"] == "fetched":
+                parts.append(f"SOURCE [{src['url']}]:\n{src['content']}")
+            else:
+                parts.append(f"SOURCE [{src['url']}]: FAILED ({src['status']})")
+        return "\n\n".join(parts)
+
+    # ── View Functions ──
 
     @gl.public.view
     def get_platform_config(self) -> dict[str, str]:
@@ -64,6 +85,8 @@ class AccordMesh(gl.Contract):
     @gl.public.view
     def get_case_document(self, case_id: u256) -> str:
         return self.cases[case_id]
+
+    # ── File Dispute (claimant stakes) ──
 
     @gl.public.write.payable
     def file_dispute(
@@ -105,6 +128,14 @@ class AccordMesh(gl.Contract):
             "settlement_option_b": "",
             "settlement_option_c": "",
             "draft_resolution": "",
+            "adjudication": {
+                "verdict": "",
+                "confidence": "",
+                "score": 0,
+                "reason": "",
+                "evidence_used": [],
+                "fetched_sources_summary": [],
+            },
             "mediation_positions": {},
             "final_terms": "",
             "escrow": {
@@ -135,6 +166,8 @@ class AccordMesh(gl.Contract):
         self._save_case(case_id, case_doc)
         return case_id
 
+    # ── Fund Respondent Stake ──
+
     @gl.public.write.payable
     def fund_respondent_stake(self, case_id: u256) -> None:
         case_doc = self._require_case(case_id)
@@ -143,7 +176,6 @@ class AccordMesh(gl.Contract):
 
         escrow = case_doc["escrow"]
         required_stake_int = int(escrow["required_stake_wei"])
-
         assert escrow["respondent_deposited"] is False, "RESPONDENT_ALREADY_FUNDED"
         assert int(gl.message.value) == required_stake_int, "STAKE_MISMATCH"
 
@@ -151,8 +183,9 @@ class AccordMesh(gl.Contract):
         escrow["respondent_deposited"] = True
         escrow["total_escrow_wei"] = int(escrow["claimant_stake_wei"]) + required_stake_int
         case_doc["stage"] = "RESPONSE_PENDING"
-
         self._save_case(case_id, case_doc)
+
+    # ── Submit Response ──
 
     @gl.public.write
     def submit_response(
@@ -172,70 +205,59 @@ class AccordMesh(gl.Contract):
         case_doc["stage"] = "ANALYSIS_READY"
         self._save_case(case_id, case_doc)
 
+    # ── Analyze Case (on-chain evidence fetching + AI analysis) ──
+
     @gl.public.write
     def analyze_case(self, case_id: u256) -> None:
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "ANALYSIS_READY", "INVALID_STAGE"
 
-        # Fetch evidence URLs on-chain
-        all_evidence_urls = case_doc.get("claimant_evidence_urls", []) + case_doc.get("respondent_evidence_urls", [])
-        fetched_evidence: list[dict] = []
-        for url in all_evidence_urls:
-            if isinstance(url, str) and url.strip().startswith("http"):
-                try:
-                    page_text = gl.nondet.web.render(url.strip(), mode="text")
-                    fetched_evidence.append({
-                        "url": url.strip(),
-                        "content": str(page_text)[:3000],
-                        "status": "fetched",
-                    })
-                except Exception as exc:
-                    fetched_evidence.append({
-                        "url": url.strip(),
-                        "content": "",
-                        "status": f"error: {str(exc)[:200]}",
-                    })
+        # Fetch BOTH parties' evidence URLs on-chain
+        claimant_urls = case_doc.get("claimant_evidence_urls", [])
+        respondent_urls = case_doc.get("respondent_evidence_urls", [])
+        all_urls = claimant_urls + respondent_urls
 
-        fetched_text = "No evidence URLs were fetched."
-        if fetched_evidence:
-            parts = []
-            for src in fetched_evidence:
-                if src["status"] == "fetched":
-                    parts.append(f"SOURCE [{src['url']}]:\n{src['content']}")
-                else:
-                    parts.append(f"SOURCE [{src['url']}]: FAILED ({src['status']})")
-            fetched_text = "\n\n".join(parts)
+        fetched_claimant = self._fetch_urls(claimant_urls)
+        fetched_respondent = self._fetch_urls(respondent_urls)
+        all_fetched = fetched_claimant + fetched_respondent
 
-        prompt = f"""
-You are a neutral dispute analyst for a digital escrow arbitration platform.
+        fetched_claimant_text = self._format_fetched(fetched_claimant)
+        fetched_respondent_text = self._format_fetched(fetched_respondent)
+
+        prompt = f"""You are a neutral dispute analyst for a bilateral escrow arbitration platform.
 
 Rules URI: {self.rules_uri}
 Case type: {case_doc["case_type"]}
 Title: {case_doc["title"]}
 
-Claimant statement:
-BEGIN_CLAIMANT
+CLAIMANT STATEMENT:
 {case_doc["claimant_statement"][:4000]}
-END_CLAIMANT
 
-Respondent statement:
-BEGIN_RESPONDENT
+RESPONDENT STATEMENT:
 {case_doc["respondent_statement"][:4000]}
-END_RESPONDENT
 
-FETCHED EVIDENCE (independently retrieved on-chain):
-{fetched_text}
+FETCHED CLAIMANT EVIDENCE (independently retrieved on-chain):
+{fetched_claimant_text}
+
+FETCHED RESPONDENT EVIDENCE (independently retrieved on-chain):
+{fetched_respondent_text}
+
+INSTRUCTIONS:
+1. Cross-reference claimant claims against fetched claimant evidence.
+2. Cross-reference respondent claims against fetched respondent evidence.
+3. Check if fetched sources confirm or contradict either party's narrative.
+4. Identify which party has stronger support from authoritative data.
+5. Assess credibility gaps: what evidence is missing that would settle the dispute?
 
 Return JSON with exactly these keys:
 {{
-  "issue_map": "short bullet-style issue map",
-  "credibility_notes": "brief note on missing facts and competing claims, cross-referenced against fetched evidence",
-  "settlement_option_a": "practical settlement path A",
-  "settlement_option_b": "practical settlement path B",
-  "settlement_option_c": "practical settlement path C",
-  "draft_resolution": "neutral draft memo summarizing likely fair resolution grounded in fetched evidence"
-}}
-"""
+  "issue_map": "bullet-style issue map identifying key factual disputes",
+  "credibility_notes": "assessment of which party's evidence is stronger and why, cross-referenced against fetched sources",
+  "settlement_option_a": "practical settlement path favoring claimant",
+  "settlement_option_b": "practical settlement path favoring respondent",
+  "settlement_option_c": "compromise / split settlement path",
+  "draft_resolution": "neutral draft memo with likely fair resolution grounded in fetched evidence"
+}}"""
 
         def nondet():
             response = gl.nondet.exec_prompt(prompt, response_format="json")
@@ -252,6 +274,137 @@ Return JSON with exactly these keys:
         case_doc["draft_resolution"] = str(analysis.get("draft_resolution", ""))[:5000]
         case_doc["stage"] = "MEDIATION_OPEN"
         self._save_case(case_id, case_doc)
+
+    # ── Adjudicate Dispute (leader-validator consensus verdict) ──
+
+    @gl.public.write
+    def adjudicate_dispute(self, case_id: u256) -> None:
+        """Run leader-validator consensus to produce a binding verdict."""
+        case_doc = self._require_case(case_id)
+        assert case_doc["stage"] == "MEDIATION_OPEN", "INVALID_STAGE"
+
+        # Fetch all evidence URLs on-chain
+        claimant_urls = case_doc.get("claimant_evidence_urls", [])
+        respondent_urls = case_doc.get("respondent_evidence_urls", [])
+        fetched_claimant = self._fetch_urls(claimant_urls)
+        fetched_respondent = self._fetch_urls(respondent_urls)
+        fetched_claimant_text = self._format_fetched(fetched_claimant)
+        fetched_respondent_text = self._format_fetched(fetched_respondent)
+
+        prompt = f"""You are an adjudicator for a bilateral escrow dispute on GenLayer.
+
+CASE:
+Type: {case_doc["case_type"]}
+Title: {case_doc["title"]}
+
+CLAIMANT: {case_doc["claimant_statement"][:3000]}
+RESPONDENT: {case_doc["respondent_statement"][:3000]}
+
+CLAIMANT EVIDENCE (fetched on-chain):
+{fetched_claimant_text}
+
+RESPONDENT EVIDENCE (fetched on-chain):
+{fetched_respondent_text}
+
+ANALYSIS:
+Issue map: {case_doc.get("issue_map", "N/A")}
+Credibility: {case_doc.get("credibility_notes", "N/A")}
+Draft resolution: {case_doc.get("draft_resolution", "N/A")}
+
+MEDIATION POSITIONS:
+{json.dumps(case_doc.get("mediation_positions", {}))}
+
+Return JSON:
+{{
+  "verdict": "CLAIMANT_FAVORED" | "RESPONDENT_FAVORED" | "SPLIT" | "UNDERTERMINED",
+  "confidence": "high" | "medium" | "low",
+  "score": 0-100,
+  "reason": "concise explanation grounded in fetched evidence and analysis",
+  "evidence_used": ["bullet 1", "bullet 2", "bullet 3"],
+  "fetched_sources_summary": ["source 1 summary", "source 2 summary"]
+}}"""
+
+        def leader_fn() -> dict:
+            response = gl.nondet.exec_prompt(prompt, response_format="json")
+            result = json.loads(response)
+
+            # Validate verdict
+            verdict = str(result.get("verdict", "")).strip().upper()
+            if verdict not in ("CLAIMANT_FAVORED", "RESPONDENT_FAVORED", "SPLIT", "UNDERTERMINED"):
+                raise Exception(f"Invalid verdict: {verdict}")
+
+            confidence = str(result.get("confidence", "medium")).strip().lower()
+            if confidence not in ("high", "medium", "low"):
+                confidence = "medium"
+
+            score = int(round(float(str(result.get("score", 0)).strip())))
+            score = max(0, min(100, score))
+
+            reason = str(result.get("reason", "")).strip()
+            if not reason:
+                raise Exception("Missing reason")
+
+            evidence_used = result.get("evidence_used", [])
+            if not isinstance(evidence_used, list):
+                evidence_used = []
+
+            fetched_summary = result.get("fetched_sources_summary", [])
+            if not isinstance(fetched_summary, list):
+                fetched_summary = []
+
+            return {
+                "verdict": verdict,
+                "confidence": confidence,
+                "score": score,
+                "reason": reason,
+                "evidence_used": [str(e).strip() for e in evidence_used[:8]],
+                "fetched_sources_summary": [str(s).strip() for s in fetched_summary[:5]],
+            }
+
+        def validator_fn(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+
+            my_result = leader_fn()
+            other = leader_result.calldata
+            if not isinstance(other, dict):
+                return False
+
+            # Must agree on verdict
+            if my_result["verdict"] != other.get("verdict"):
+                return False
+
+            # Confidence within 1 rank
+            conf_rank = {"low": 1, "medium": 2, "high": 3}
+            my_conf = conf_rank.get(my_result["confidence"], 2)
+            other_conf = conf_rank.get(str(other.get("confidence", "medium")).lower(), 2)
+            if abs(my_conf - other_conf) > 1:
+                return False
+
+            # Score within 20 points
+            try:
+                other_score = int(other.get("score", 0))
+            except Exception:
+                return False
+            if abs(my_result["score"] - other_score) > 20:
+                return False
+
+            return True
+
+        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+
+        # Store adjudication result
+        case_doc["adjudication"] = {
+            "verdict": result["verdict"],
+            "confidence": result["confidence"],
+            "score": result["score"],
+            "reason": result["reason"],
+            "evidence_used": result["evidence_used"],
+            "fetched_sources_summary": result.get("fetched_sources_summary", []),
+        }
+        self._save_case(case_id, case_doc)
+
+    # ── Mediation Position ──
 
     @gl.public.write
     def record_mediation_position(
@@ -275,6 +428,8 @@ Return JSON with exactly these keys:
         }
         self._save_case(case_id, case_doc)
 
+    # ── Assign Role ──
+
     @gl.public.write
     def assign_case_role(
         self,
@@ -290,8 +445,9 @@ Return JSON with exactly these keys:
 
         if assignee_hex not in case_doc["roles"][role_name]:
             case_doc["roles"][role_name].append(assignee_hex)
-
         self._save_case(case_id, case_doc)
+
+    # ── Submit Appeal ──
 
     @gl.public.write
     def submit_appeal(
@@ -309,18 +465,18 @@ Return JSON with exactly these keys:
         sender = gl.message.sender_address.as_hex
         assert self._has_access(case_doc, sender), "NO_CASE_ACCESS"
 
-        case_doc["appeals"].append(
-            {
-                "submitted_by": sender,
-                "requested_action": requested_action[:1000],
-                "rationale": rationale[:3000],
-                "evidence_urls": self._split_csv(evidence_urls_csv),
-                "status": "PENDING_REVIEW",
-                "review_memo": "",
-                "reviewed_by": "",
-            }
-        )
+        case_doc["appeals"].append({
+            "submitted_by": sender,
+            "requested_action": requested_action[:1000],
+            "rationale": rationale[:3000],
+            "evidence_urls": self._split_csv(evidence_urls_csv),
+            "status": "PENDING_REVIEW",
+            "review_memo": "",
+            "reviewed_by": "",
+        })
         self._save_case(case_id, case_doc)
+
+    # ── Review Appeal ──
 
     @gl.public.write
     def review_appeal(
@@ -353,6 +509,8 @@ Return JSON with exactly these keys:
 
         self._save_case(case_id, case_doc)
 
+    # ── Publish Final Terms (operator resolves + escrow settlement) ──
+
     @gl.public.write
     def publish_final_terms(
         self,
@@ -368,6 +526,10 @@ Return JSON with exactly these keys:
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "MEDIATION_OPEN", "INVALID_STAGE"
         assert final_terms.strip() != "", "FINAL_TERMS_REQUIRED"
+
+        # Require adjudication before finalizing
+        adj = case_doc.get("adjudication", {})
+        assert adj.get("verdict", "") != "", "ADJUDICATION_REQUIRED"
 
         escrow = case_doc["escrow"]
         assert escrow["claimant_deposited"] is True, "CLAIMANT_STAKE_REQUIRED"

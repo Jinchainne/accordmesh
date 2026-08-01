@@ -59,6 +59,14 @@ export type DisputeRecord = {
   settlementOptions: string[];
   draftResolution: string;
   mediationPositions: Record<string, MediationPosition>;
+  adjudication?: {
+    verdict: string;
+    confidence: string;
+    score: number;
+    reason: string;
+    evidence_used: string[];
+    fetched_sources_summary: string[];
+  };
   finalTerms: string;
   roles: CaseRoles;
   appeals: AppealRecord[];
