@@ -223,7 +223,7 @@ export default function Home() {
         setDisputes([
           {
             id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
-            stage: "ANALYSIS" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
+            stage: "ANALYSIS_READY" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
             claimantStatement: "The reentrancy vulnerability in VaultX's withdraw function is severity CRITICAL, not medium as the auditor claims. Funds are at risk.",
             respondentStatement: "The audit followed standard methodology. The reentrancy guard mitigates the risk to low severity.",
             claimantEvidenceUrls: ["https://example.com/audit-report.pdf"], respondentEvidenceUrls: ["https://example.com/audit-methodology.md"],
@@ -234,7 +234,7 @@ export default function Home() {
           },
           {
             id: "ACD-8819", caseType: "Governance", title: "DAO Treasury Misallocation Claim",
-            stage: "MEDIATION" as DisputeStage, claimant: "0x1111...2222", respondent: "0x3333...4444",
+            stage: "MEDIATION_OPEN" as DisputeStage, claimant: "0x1111...2222", respondent: "0x3333...4444",
             claimantStatement: "Proposal #44 allocated treasury funds to a project not approved by governance vote.",
             respondentStatement: "The allocation was within the delegated authority of the treasury committee.",
             claimantEvidenceUrls: [], respondentEvidenceUrls: [],
