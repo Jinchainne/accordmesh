@@ -962,7 +962,15 @@ export default function Home() {
               </div>
               <div className="form-field">
                 <label>Respondent Address</label>
-                <input type="text" value={newDispute.respondent} onChange={(e) => setNewDispute({ ...newDispute, respondent: e.target.value })} placeholder="0x…" className="mono-input" />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input type="text" value={newDispute.respondent} onChange={(e) => setNewDispute({ ...newDispute, respondent: e.target.value })} placeholder="0x…" className="mono-input" style={{ flex: 1 }} />
+                  {walletAddr && (
+                    <button type="button" className="filter-tag" style={{ whiteSpace: "nowrap", cursor: "pointer" }} onClick={() => setNewDispute({ ...newDispute, respondent: walletAddr })}>
+                      Use my wallet
+                    </button>
+                  )}
+                </div>
+                <small style={{ color: "#73777c" }}>Use "Use my wallet" to test the full workflow as both parties.</small>
               </div>
               <div className="form-field">
                 <label>Claimant Statement</label>
