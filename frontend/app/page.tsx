@@ -115,7 +115,7 @@ function stageToFilterMatch(stage: DisputeStage, filter: string): boolean {
 function getMockDisputes(): DisputeRecord[] {
   return [
     {
-      id: "ACD-8821", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
+      id: "999001", caseType: "Technical", title: "Smart Contract Audit Dispute: VaultX",
       stage: "ANALYSIS_READY" as DisputeStage, claimant: "0x3637...34bd", respondent: "0x9abc...def0",
       claimantStatement: "The reentrancy vulnerability in VaultX's withdraw function is severity CRITICAL, not medium as the auditor claims. Funds are at risk.",
       respondentStatement: "The audit followed standard methodology. The reentrancy guard mitigates the risk to low severity.",
@@ -130,7 +130,7 @@ function getMockDisputes(): DisputeRecord[] {
       adjudication: { verdict: "CLAIMANT_FAVORED", confidence: "high", score: 82, reason: "Independent audit confirms CRITICAL severity. Respondent's methodology defense is insufficient.", evidence_used: ["Audit report", "Reentrancy test results", "VaultX code review"], fetched_sources_summary: ["Fetched audit report confirms CRITICAL finding"] },
     },
     {
-      id: "ACD-8819", caseType: "Governance", title: "DAO Treasury Misallocation Claim",
+      id: "999002", caseType: "Governance", title: "DAO Treasury Misallocation Claim",
       stage: "MEDIATION_OPEN" as DisputeStage, claimant: "0x1111...2222", respondent: "0x3333...4444",
       claimantStatement: "Proposal #44 allocated treasury funds to a project not approved by governance vote.",
       respondentStatement: "The allocation was within the delegated authority of the treasury committee.",
@@ -144,7 +144,7 @@ function getMockDisputes(): DisputeRecord[] {
       appeals: [], escrow: { requiredStakeWei: "120500000000000000000000", claimantStakeWei: "120500000000000000000000", respondentStakeWei: "120500000000000000000000", claimantDeposited: true, respondentDeposited: true, totalEscrowWei: "241000000000000000000000", winner: "", loserPenaltyBps: 0, operatorFeeBps: 0, winnerPayoutWei: "0", loserRefundWei: "0", operatorFeeWei: "0", settled: false },
     },
     {
-      id: "ACD-8815", caseType: "Data Integrity", title: "Oracle Price Feed Manipulation",
+      id: "999003", caseType: "Data Integrity", title: "Oracle Price Feed Manipulation",
       stage: "STAKE_PENDING" as DisputeStage, claimant: "0x5555...6666", respondent: "0x7777...8888",
       claimantStatement: "Abnormal price spikes in the lending protocol were caused by oracle manipulation.",
       respondentStatement: "The price feed operated correctly within normal market volatility.",
@@ -303,11 +303,13 @@ export default function Home() {
 
   const handleFundStake = () => {
     if (!selectedCaseId) return;
+    if (selectedCaseId.startsWith("999")) { setTxStatus({ phase: "success", label: "Funding respondent stake…", hash: "0xdemo_fund_" + selectedCaseId }); return; }
     executeAction("Funding respondent stake…", () => fundRespondentStake({ caseId: selectedCaseId }, walletAddr));
   };
 
   const handleSubmitResponse = () => {
     if (!selectedCaseId) return;
+    if (selectedCaseId.startsWith("999")) { setTxStatus({ phase: "success", label: "Submitting response…", hash: "0xdemo_response_" + selectedCaseId }); return; }
     executeAction("Submitting response…", () =>
       submitResponse({ caseId: selectedCaseId, respondentStatement: responseStatement, evidenceUrls: responseEvidence }, walletAddr)
     );
@@ -315,11 +317,13 @@ export default function Home() {
 
   const handleAnalyzeCase = () => {
     if (!selectedCaseId) return;
+    if (selectedCaseId.startsWith("999")) { setTxStatus({ phase: "success", label: "Analyzing case (AI)…", hash: "0xdemo_analyze_" + selectedCaseId }); return; }
     executeAction("Analyzing case (AI)…", () => analyzeCase(selectedCaseId, walletAddr));
   };
 
   const handleAdjudicate = () => {
     if (!selectedCaseId) return;
+    if (selectedCaseId.startsWith("999")) { setTxStatus({ phase: "success", label: "Adjudicating dispute…", hash: "0xdemo_adjudicate_" + selectedCaseId }); return; }
     executeAction("Adjudicating dispute…", () => adjudicateDispute(selectedCaseId, walletAddr));
   };
 
