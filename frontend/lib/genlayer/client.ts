@@ -32,14 +32,14 @@ export function createWriteClient(address: `0x${string}`, provider: EthereumProv
 
 // Timeout wrapper for RPC calls (15s default)
 export async function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`RPC request timed out after ${ms / 1000}s`)), ms);
   });
   try {
     return await Promise.race([promise, timeout]);
   } finally {
-    clearTimeout(timer);
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
