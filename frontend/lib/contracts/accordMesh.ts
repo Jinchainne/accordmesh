@@ -329,7 +329,6 @@ export class AccordMeshContractClient {
       args: [
         BigInt(input.caseId),
         input.finalTerms,
-        input.prevailingParty,
         BigInt(input.loserPenaltyBps),
         BigInt(input.operatorFeeBps),
       ],

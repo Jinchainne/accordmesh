@@ -101,7 +101,6 @@ export type MediationInput = {
 export type FinalTermsInput = {
   caseId: string;
   finalTerms: string;
-  prevailingParty: PrevailingParty;
   loserPenaltyBps: number;
   operatorFeeBps: number;
 };

@@ -795,15 +795,10 @@ export function CaseDetail({
               </div>
               <div className="two-col">
                 <div className="field">
-                  <label htmlFor="prevailingParty">Winning side</label>
-                  <select
-                    id="prevailingParty"
-                    value={prevailingParty}
-                    onChange={(event) => setPrevailingParty(event.target.value as PrevailingParty)}
-                  >
-                    <option value="CLAIMANT">Claimant</option>
-                    <option value="RESPONDENT">Respondent</option>
-                  </select>
+                  <label>Winning side (from consensus)</label>
+                  <div className="read-only-value" style={{ padding: "8px 12px", background: "var(--surface-container-low)", borderRadius: 4, fontWeight: 600 }}>
+                    {currentDispute.adjudication?.verdict?.includes("CLAIMANT") ? "Claimant" : currentDispute.adjudication?.verdict?.includes("RESPONDENT") ? "Respondent" : currentDispute.adjudication?.verdict || "Run adjudication first"}
+                  </div>
                 </div>
                 <div className="field">
                   <label htmlFor="loserPenaltyBps">Loser penalty (%)</label>
@@ -848,7 +843,6 @@ export function CaseDetail({
                     onFinalize({
                       caseId: currentDispute.id,
                       finalTerms,
-                      prevailingParty,
                       loserPenaltyBps: Number(loserPenaltyBps),
                       operatorFeeBps: Number(operatorFeeBps),
                     }),

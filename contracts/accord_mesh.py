@@ -4,6 +4,24 @@ from genlayer import *
 import json
 
 
+# Valid verdicts that map to payout outcomes
+VERDICT_CLAIMANT_FAVORED = "CLAIMANT_FAVORED"
+VERDICT_RESPONDENT_FAVORED = "RESPONDENT_FAVORED"
+VERDICT_SPLIT = "SPLIT"
+VERDICT_UNDETERMINED = "UNDETERMINED"
+VALID_VERDICTS = (VERDICT_CLAIMANT_FAVORED, VERDICT_RESPONDENT_FAVORED, VERDICT_SPLIT, VERDICT_UNDETERMINED)
+
+# Deadline: respondent must fund within this many blocks after filing
+RESPONDENT_FUND_DEADLINE_BLOCKS = 500
+
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+    class Write:
+        pass
+
+
 class AccordMesh(gl.Contract):
     platform_name: str
     rules_uri: str
@@ -17,6 +35,8 @@ class AccordMesh(gl.Contract):
         self.rules_uri = rules_uri
         self.operator = gl.message.sender_address
         self.next_case_id = 1
+
+    # ── Helpers ──
 
     def _require_case(self, case_id: u256) -> dict:
         assert case_id in self.cases, "CASE_NOT_FOUND"
@@ -40,9 +60,10 @@ class AccordMesh(gl.Contract):
     def _send_gen(self, recipient_hex: str, amount: int) -> None:
         if amount <= 0:
             return
-        _Recipient(Address(recipient_hex)).emit_transfer(value=u256(amount), on="finalized")
+        _Recipient(Address(recipient_hex)).emit_transfer(value=u256(amount))
 
     def _fetch_urls(self, urls: list[str]) -> list[dict]:
+        """Fetch URLs on-chain. MUST be called inside consensus path."""
         fetched: list[dict] = []
         for url in urls:
             if isinstance(url, str) and url.strip().startswith("http"):
@@ -63,6 +84,14 @@ class AccordMesh(gl.Contract):
             else:
                 parts.append(f"SOURCE [{src['url']}]: FAILED ({src['status']})")
         return "\n\n".join(parts)
+
+    def _verdict_to_prevailing(self, verdict: str) -> str:
+        """Map consensus verdict to prevailing party. Raises for SPLIT/UNDETERMINED."""
+        if verdict == VERDICT_CLAIMANT_FAVORED:
+            return "CLAIMANT"
+        if verdict == VERDICT_RESPONDENT_FAVORED:
+            return "RESPONDENT"
+        return ""  # SPLIT and UNDETERMINED handled separately
 
     # ── View Functions ──
 
@@ -110,6 +139,7 @@ class AccordMesh(gl.Contract):
         claimant_hex = gl.message.sender_address.as_hex
         respondent_hex = Address(respondent_address).as_hex
         required_stake_int = int(required_stake)
+        current_block = int(gl.vm.block_number)
 
         case_doc = {
             "id": int(case_id),
@@ -153,6 +183,7 @@ class AccordMesh(gl.Contract):
                 "operator_fee_wei": 0,
                 "settled": False,
             },
+            "respondent_fund_deadline_block": current_block + RESPONDENT_FUND_DEADLINE_BLOCKS,
             "roles": {
                 "claimant": [claimant_hex],
                 "respondent": [respondent_hex],
@@ -166,6 +197,31 @@ class AccordMesh(gl.Contract):
         self._save_case(case_id, case_doc)
         return case_id
 
+    # ── Claimant Withdraw (timeout: respondent didn't fund) ──
+
+    @gl.public.write
+    def claimant_withdraw(self, case_id: u256) -> None:
+        """Claimant reclaims stake if respondent failed to fund before deadline."""
+        case_doc = self._require_case(case_id)
+        assert case_doc["stage"] == "STAKE_PENDING", "INVALID_STAGE"
+        assert gl.message.sender_address.as_hex == case_doc["claimant"], "ONLY_CLAIMANT"
+
+        deadline_block = case_doc.get("respondent_fund_deadline_block", 0)
+        assert int(gl.vm.block_number) > deadline_block, "DEADLINE_NOT_PASSED"
+
+        escrow = case_doc["escrow"]
+        assert escrow["settled"] is False, "ALREADY_SETTLED"
+        assert escrow["claimant_deposited"] is True, "NO_CLAIMANT_STAKE"
+
+        # Refund claimant
+        self._send_gen(case_doc["claimant"], int(escrow["claimant_stake_wei"]))
+        escrow["settled"] = True
+        escrow["winner"] = "CLAIMANT_WITHDRAWN"
+        escrow["claimant_stake_wei"] = 0
+        escrow["total_escrow_wei"] = 0
+        case_doc["stage"] = "RESOLVED"
+        self._save_case(case_id, case_doc)
+
     # ── Fund Respondent Stake ──
 
     @gl.public.write.payable
@@ -173,6 +229,10 @@ class AccordMesh(gl.Contract):
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "STAKE_PENDING", "INVALID_STAGE"
         assert gl.message.sender_address.as_hex == case_doc["respondent"], "ONLY_RESPONDENT"
+
+        # Check deadline hasn't passed
+        deadline_block = case_doc.get("respondent_fund_deadline_block", 0)
+        assert int(gl.vm.block_number) <= deadline_block, "FUND_DEADLINE_PASSED"
 
         escrow = case_doc["escrow"]
         required_stake_int = int(escrow["required_stake_wei"])
@@ -205,36 +265,40 @@ class AccordMesh(gl.Contract):
         case_doc["stage"] = "ANALYSIS_READY"
         self._save_case(case_id, case_doc)
 
-    # ── Analyze Case (on-chain evidence fetching + AI analysis) ──
+    # ── Analyze Case (web fetching + AI analysis INSIDE consensus) ──
 
     @gl.public.write
     def analyze_case(self, case_id: u256) -> None:
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "ANALYSIS_READY", "INVALID_STAGE"
 
-        # Fetch BOTH parties' evidence URLs on-chain
-        claimant_urls = case_doc.get("claimant_evidence_urls", [])
-        respondent_urls = case_doc.get("respondent_evidence_urls", [])
-        all_urls = claimant_urls + respondent_urls
+        # Snapshot inputs BEFORE consensus
+        claimant_urls = list(case_doc.get("claimant_evidence_urls", []))
+        respondent_urls = list(case_doc.get("respondent_evidence_urls", []))
+        claimant_stmt = str(case_doc["claimant_statement"])[:4000]
+        respondent_stmt = str(case_doc["respondent_statement"])[:4000]
+        case_type = str(case_doc["case_type"])
+        title = str(case_doc["title"])
+        rules_uri = str(self.rules_uri)
 
-        fetched_claimant = self._fetch_urls(claimant_urls)
-        fetched_respondent = self._fetch_urls(respondent_urls)
-        all_fetched = fetched_claimant + fetched_respondent
+        def nondet():
+            # Fetch URLs INSIDE consensus path — both leader and validator fetch independently
+            fetched_claimant = self._fetch_urls(claimant_urls)
+            fetched_respondent = self._fetch_urls(respondent_urls)
+            fetched_claimant_text = self._format_fetched(fetched_claimant)
+            fetched_respondent_text = self._format_fetched(fetched_respondent)
 
-        fetched_claimant_text = self._format_fetched(fetched_claimant)
-        fetched_respondent_text = self._format_fetched(fetched_respondent)
+            prompt = f"""You are a neutral dispute analyst for a bilateral escrow arbitration platform.
 
-        prompt = f"""You are a neutral dispute analyst for a bilateral escrow arbitration platform.
-
-Rules URI: {self.rules_uri}
-Case type: {case_doc["case_type"]}
-Title: {case_doc["title"]}
+Rules URI: {rules_uri}
+Case type: {case_type}
+Title: {title}
 
 CLAIMANT STATEMENT:
-{case_doc["claimant_statement"][:4000]}
+{claimant_stmt}
 
 RESPONDENT STATEMENT:
-{case_doc["respondent_statement"][:4000]}
+{respondent_stmt}
 
 FETCHED CLAIMANT EVIDENCE (independently retrieved on-chain):
 {fetched_claimant_text}
@@ -259,7 +323,6 @@ Return JSON with exactly these keys:
   "draft_resolution": "neutral draft memo with likely fair resolution grounded in fetched evidence"
 }}"""
 
-        def nondet():
             response = gl.nondet.exec_prompt(prompt, response_format="json")
             return json.loads(response)
 
@@ -275,7 +338,7 @@ Return JSON with exactly these keys:
         case_doc["stage"] = "MEDIATION_OPEN"
         self._save_case(case_id, case_doc)
 
-    # ── Adjudicate Dispute (leader-validator consensus verdict) ──
+    # ── Adjudicate Dispute (leader-validator consensus, web fetch INSIDE) ──
 
     @gl.public.write
     def adjudicate_dispute(self, case_id: u256) -> None:
@@ -283,22 +346,33 @@ Return JSON with exactly these keys:
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "MEDIATION_OPEN", "INVALID_STAGE"
 
-        # Fetch all evidence URLs on-chain
-        claimant_urls = case_doc.get("claimant_evidence_urls", [])
-        respondent_urls = case_doc.get("respondent_evidence_urls", [])
-        fetched_claimant = self._fetch_urls(claimant_urls)
-        fetched_respondent = self._fetch_urls(respondent_urls)
-        fetched_claimant_text = self._format_fetched(fetched_claimant)
-        fetched_respondent_text = self._format_fetched(fetched_respondent)
+        # Snapshot inputs BEFORE consensus
+        claimant_urls = list(case_doc.get("claimant_evidence_urls", []))
+        respondent_urls = list(case_doc.get("respondent_evidence_urls", []))
+        claimant_stmt = str(case_doc["claimant_statement"])[:3000]
+        respondent_stmt = str(case_doc["respondent_statement"])[:3000]
+        case_type = str(case_doc["case_type"])
+        title = str(case_doc["title"])
+        issue_map = str(case_doc.get("issue_map", "N/A"))
+        credibility = str(case_doc.get("credibility_notes", "N/A"))
+        draft = str(case_doc.get("draft_resolution", "N/A"))
+        mediation = json.dumps(case_doc.get("mediation_positions", {}))
 
-        prompt = f"""You are an adjudicator for a bilateral escrow dispute on GenLayer.
+        def leader_fn() -> dict:
+            # Fetch URLs INSIDE consensus — both leader and validator fetch independently
+            fetched_claimant = self._fetch_urls(claimant_urls)
+            fetched_respondent = self._fetch_urls(respondent_urls)
+            fetched_claimant_text = self._format_fetched(fetched_claimant)
+            fetched_respondent_text = self._format_fetched(fetched_respondent)
+
+            prompt = f"""You are an adjudicator for a bilateral escrow dispute on GenLayer.
 
 CASE:
-Type: {case_doc["case_type"]}
-Title: {case_doc["title"]}
+Type: {case_type}
+Title: {title}
 
-CLAIMANT: {case_doc["claimant_statement"][:3000]}
-RESPONDENT: {case_doc["respondent_statement"][:3000]}
+CLAIMANT: {claimant_stmt}
+RESPONDENT: {respondent_stmt}
 
 CLAIMANT EVIDENCE (fetched on-chain):
 {fetched_claimant_text}
@@ -307,16 +381,16 @@ RESPONDENT EVIDENCE (fetched on-chain):
 {fetched_respondent_text}
 
 ANALYSIS:
-Issue map: {case_doc.get("issue_map", "N/A")}
-Credibility: {case_doc.get("credibility_notes", "N/A")}
-Draft resolution: {case_doc.get("draft_resolution", "N/A")}
+Issue map: {issue_map}
+Credibility: {credibility}
+Draft resolution: {draft}
 
 MEDIATION POSITIONS:
-{json.dumps(case_doc.get("mediation_positions", {}))}
+{mediation}
 
 Return JSON:
 {{
-  "verdict": "CLAIMANT_FAVORED" | "RESPONDENT_FAVORED" | "SPLIT" | "UNDERTERMINED",
+  "verdict": "CLAIMANT_FAVORED" | "RESPONDENT_FAVORED" | "SPLIT" | "UNDETERMINED",
   "confidence": "high" | "medium" | "low",
   "score": 0-100,
   "reason": "concise explanation grounded in fetched evidence and analysis",
@@ -324,13 +398,11 @@ Return JSON:
   "fetched_sources_summary": ["source 1 summary", "source 2 summary"]
 }}"""
 
-        def leader_fn() -> dict:
             response = gl.nondet.exec_prompt(prompt, response_format="json")
             result = json.loads(response)
 
-            # Validate verdict
             verdict = str(result.get("verdict", "")).strip().upper()
-            if verdict not in ("CLAIMANT_FAVORED", "RESPONDENT_FAVORED", "SPLIT", "UNDERTERMINED"):
+            if verdict not in VALID_VERDICTS:
                 raise Exception(f"Invalid verdict: {verdict}")
 
             confidence = str(result.get("confidence", "medium")).strip().lower()
@@ -370,18 +442,15 @@ Return JSON:
             if not isinstance(other, dict):
                 return False
 
-            # Must agree on verdict
             if my_result["verdict"] != other.get("verdict"):
                 return False
 
-            # Confidence within 1 rank
             conf_rank = {"low": 1, "medium": 2, "high": 3}
             my_conf = conf_rank.get(my_result["confidence"], 2)
             other_conf = conf_rank.get(str(other.get("confidence", "medium")).lower(), 2)
             if abs(my_conf - other_conf) > 1:
                 return False
 
-            # Score within 20 points
             try:
                 other_score = int(other.get("score", 0))
             except Exception:
@@ -393,7 +462,6 @@ Return JSON:
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
 
-        # Store adjudication result
         case_doc["adjudication"] = {
             "verdict": result["verdict"],
             "confidence": result["confidence"],
@@ -504,32 +572,45 @@ Return JSON:
         case_doc["appeals"][idx]["reviewed_by"] = sender
 
         if disposition == "REOPENED":
-            case_doc["stage"] = "MEDIATION_OPEN"
-            case_doc["escrow"]["settled"] = False
+            # Reopen goes back to ANALYSIS_READY (not MEDIATION_OPEN) to re-analyze
+            # Do NOT reset escrow — previous settlement stands until new adjudication
+            case_doc["stage"] = "ANALYSIS_READY"
+            # Clear previous adjudication for fresh consensus
+            case_doc["adjudication"] = {
+                "verdict": "",
+                "confidence": "",
+                "score": 0,
+                "reason": "",
+                "evidence_used": [],
+                "fetched_sources_summary": [],
+            }
 
         self._save_case(case_id, case_doc)
 
-    # ── Publish Final Terms (operator resolves + escrow settlement) ──
+    # ── Publish Final Terms (payout BOUND to consensus verdict) ──
 
     @gl.public.write
     def publish_final_terms(
         self,
         case_id: u256,
         final_terms: str,
-        prevailing_party: str,
         loser_penalty_bps: u256,
         operator_fee_bps: u256,
     ) -> None:
+        """
+        Finalize and settle escrow. The prevailing party is derived from the
+        consensus verdict — the operator CANNOT override it.
+        """
         assert gl.message.sender_address == self.operator, "ONLY_OPERATOR"
-        assert prevailing_party in ["CLAIMANT", "RESPONDENT"], "INVALID_PREVAILING_PARTY"
 
         case_doc = self._require_case(case_id)
         assert case_doc["stage"] == "MEDIATION_OPEN", "INVALID_STAGE"
         assert final_terms.strip() != "", "FINAL_TERMS_REQUIRED"
 
-        # Require adjudication before finalizing
+        # Require adjudication verdict
         adj = case_doc.get("adjudication", {})
-        assert adj.get("verdict", "") != "", "ADJUDICATION_REQUIRED"
+        verdict = str(adj.get("verdict", "")).strip().upper()
+        assert verdict in VALID_VERDICTS, "ADJUDICATION_REQUIRED"
 
         escrow = case_doc["escrow"]
         assert escrow["claimant_deposited"] is True, "CLAIMANT_STAKE_REQUIRED"
@@ -545,37 +626,54 @@ Return JSON:
 
         claimant_stake = int(escrow["claimant_stake_wei"])
         respondent_stake = int(escrow["respondent_stake_wei"])
+        total_escrow = claimant_stake + respondent_stake
         claimant_fee = (claimant_stake * fee_bps_int) // 10000
         respondent_fee = (respondent_stake * fee_bps_int) // 10000
         operator_fee = claimant_fee + respondent_fee
 
-        if prevailing_party == "CLAIMANT":
+        if verdict == VERDICT_CLAIMANT_FAVORED:
+            # Claimant wins: gets own stake back + penalty from respondent
             penalty_amount = (respondent_stake * penalty_bps_int) // 10000
             winner_payout = claimant_stake - claimant_fee + penalty_amount
             loser_refund = respondent_stake - respondent_fee - penalty_amount
-            winner_recipient = case_doc["claimant"]
-            loser_recipient = case_doc["respondent"]
-        else:
+            assert loser_refund >= 0, "INSUFFICIENT_LOSER_REFUND"
+            self._send_gen(case_doc["claimant"], winner_payout)
+            self._send_gen(case_doc["respondent"], loser_refund)
+            self._send_gen(self.operator.as_hex, operator_fee)
+            escrow["winner"] = "CLAIMANT"
+
+        elif verdict == VERDICT_RESPONDENT_FAVORED:
+            # Respondent wins: gets own stake back + penalty from claimant
             penalty_amount = (claimant_stake * penalty_bps_int) // 10000
             winner_payout = respondent_stake - respondent_fee + penalty_amount
             loser_refund = claimant_stake - claimant_fee - penalty_amount
-            winner_recipient = case_doc["respondent"]
-            loser_recipient = case_doc["claimant"]
+            assert loser_refund >= 0, "INSUFFICIENT_LOSER_REFUND"
+            self._send_gen(case_doc["respondent"], winner_payout)
+            self._send_gen(case_doc["claimant"], loser_refund)
+            self._send_gen(self.operator.as_hex, operator_fee)
+            escrow["winner"] = "RESPONDENT"
 
-        assert loser_refund >= 0, "INSUFFICIENT_LOSER_REFUND"
+        elif verdict == VERDICT_SPLIT:
+            # Split: each party gets own stake minus fees, no penalty
+            claimant_refund = claimant_stake - claimant_fee
+            respondent_refund = respondent_stake - respondent_fee
+            self._send_gen(case_doc["claimant"], claimant_refund)
+            self._send_gen(case_doc["respondent"], respondent_refund)
+            self._send_gen(self.operator.as_hex, operator_fee)
+            escrow["winner"] = "SPLIT"
+            escrow["winner_payout_wei"] = claimant_refund + respondent_refund
 
-        self._send_gen(winner_recipient, winner_payout)
-        self._send_gen(loser_recipient, loser_refund)
-        self._send_gen(self.operator.as_hex, operator_fee)
+        else:  # UNDETERMINED
+            # Full refund to both parties, no penalty, no operator fee
+            self._send_gen(case_doc["claimant"], claimant_stake)
+            self._send_gen(case_doc["respondent"], respondent_stake)
+            escrow["winner"] = "UNDETERMINED"
+            operator_fee = 0
 
-        escrow["winner"] = prevailing_party
         escrow["loser_penalty_bps"] = penalty_bps_int
         escrow["operator_fee_bps"] = fee_bps_int
-        escrow["winner_payout_wei"] = winner_payout
-        escrow["loser_refund_wei"] = loser_refund
         escrow["operator_fee_wei"] = operator_fee
         escrow["settled"] = True
-        escrow["total_escrow_wei"] = claimant_stake + respondent_stake
 
         case_doc["final_terms"] = final_terms.strip()[:5000]
         case_doc["stage"] = "RESOLVED"

@@ -368,7 +368,9 @@ export async function publishFinalTerms(input: FinalTermsInput, actor?: string):
     const dispute = requireMockCase(input.caseId);
     dispute.finalTerms = input.finalTerms;
     dispute.stage = "RESOLVED";
-    dispute.escrow.winner = input.prevailingParty;
+    // Winner is derived from adjudication verdict (operator cannot override)
+    const verdict = dispute.adjudication?.verdict || "CLAIMANT_FAVORED";
+    dispute.escrow.winner = verdict === "CLAIMANT_FAVORED" ? "CLAIMANT" : verdict === "RESPONDENT_FAVORED" ? "RESPONDENT" : "";
     dispute.escrow.loserPenaltyBps = input.loserPenaltyBps;
     dispute.escrow.operatorFeeBps = input.operatorFeeBps;
     const claimantStake = BigInt(dispute.escrow.claimantStakeWei);
@@ -377,14 +379,18 @@ export async function publishFinalTerms(input: FinalTermsInput, actor?: string):
     const respondentFee = (respondentStake * BigInt(input.operatorFeeBps)) / 10_000n;
     const operatorFee = claimantFee + respondentFee;
 
-    if (input.prevailingParty === "CLAIMANT") {
+    if (verdict === "CLAIMANT_FAVORED") {
       const penalty = (respondentStake * BigInt(input.loserPenaltyBps)) / 10_000n;
       dispute.escrow.winnerPayoutWei = String(claimantStake - claimantFee + penalty);
       dispute.escrow.loserRefundWei = String(respondentStake - respondentFee - penalty);
-    } else {
+    } else if (verdict === "RESPONDENT_FAVORED") {
       const penalty = (claimantStake * BigInt(input.loserPenaltyBps)) / 10_000n;
       dispute.escrow.winnerPayoutWei = String(respondentStake - respondentFee + penalty);
       dispute.escrow.loserRefundWei = String(claimantStake - claimantFee - penalty);
+    } else {
+      // SPLIT or UNDETERMINED: refund both
+      dispute.escrow.winnerPayoutWei = String(claimantStake - claimantFee + respondentStake - respondentFee);
+      dispute.escrow.loserRefundWei = "0";
     }
 
     dispute.escrow.operatorFeeWei = String(operatorFee);

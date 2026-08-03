@@ -338,7 +338,7 @@ export default function Home() {
     if (!selectedCaseId) return;
     executeAction("Publishing final terms…", () =>
       publishFinalTerms(
-        { caseId: selectedCaseId, finalTerms: finalTermsText, prevailingParty, loserPenaltyBps, operatorFeeBps },
+        { caseId: selectedCaseId, finalTerms: finalTermsText, loserPenaltyBps, operatorFeeBps },
         walletAddr
       )
     );
@@ -886,11 +886,10 @@ export default function Home() {
                 </div>
                 <div className="form-row">
                   <div className="form-field">
-                    <label>Prevailing Party</label>
-                    <select value={prevailingParty} onChange={(e) => setPrevailingParty(e.target.value as PrevailingParty)}>
-                      <option value="CLAIMANT">Claimant</option>
-                      <option value="RESPONDENT">Respondent</option>
-                    </select>
+                    <label>Prevailing Party (from consensus)</label>
+                    <div className="read-only-value" style={{ padding: "8px 12px", background: "var(--surface-container-low)", borderRadius: 4, fontWeight: 600 }}>
+                      {selectedDispute?.adjudication?.verdict?.includes("CLAIMANT") ? "Claimant" : selectedDispute?.adjudication?.verdict?.includes("RESPONDENT") ? "Respondent" : selectedDispute?.adjudication?.verdict || "Run adjudication first"}
+                    </div>
                   </div>
                   <div className="form-field">
                     <label>Loser Penalty (bps)</label>
