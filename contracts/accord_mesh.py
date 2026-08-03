@@ -30,9 +30,9 @@ class AccordMesh(gl.Contract):
     case_ids: DynArray[u256]
     cases: TreeMap[u256, str]
 
-    def __init__(self, platform_name: str, rules_uri: str):
-        self.platform_name = platform_name
-        self.rules_uri = rules_uri
+    def __init__(self):
+        self.platform_name = "AccordMesh"
+        self.rules_uri = "https://accordmesh.vercel.app/rules"
         self.operator = gl.message.sender_address
         self.next_case_id = 1
 

@@ -1,4 +1,4 @@
-const defaultContractAddress = "0xf7F8b355543cE3730264e338039da1bA148420C3";
+const defaultContractAddress = "0x7a31F66E3EE60AB37bD39B8572B3344aE23f467b";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? defaultContractAddress;
 
