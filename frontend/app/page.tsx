@@ -888,7 +888,7 @@ export default function Home() {
                   <div className="form-field">
                     <label>Prevailing Party (from consensus)</label>
                     <div className="read-only-value" style={{ padding: "8px 12px", background: "var(--surface-container-low)", borderRadius: 4, fontWeight: 600 }}>
-                      {selectedDispute?.adjudication?.verdict?.includes("CLAIMANT") ? "Claimant" : selectedDispute?.adjudication?.verdict?.includes("RESPONDENT") ? "Respondent" : selectedDispute?.adjudication?.verdict || "Run adjudication first"}
+                      {selectedCase?.adjudication?.verdict?.includes("CLAIMANT") ? "Claimant" : selectedCase?.adjudication?.verdict?.includes("RESPONDENT") ? "Respondent" : selectedCase?.adjudication?.verdict || "Run adjudication first"}
                     </div>
                   </div>
                   <div className="form-field">
